@@ -1,6 +1,10 @@
-# Desktop Habitats
+# Cove
 
 ![Riverscape running as a live macOS wallpaper, behind desktop icons and widgets](docs/images/riverscape-desktop.png)
+
+Living scenes for your Mac desktop: an aquarium whose fish you can feed and fish for, and a lop rabbit that chases the broom your cursor has become.
+
+Cove is built on [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats) by Chase Lean. The Riverscape aquarium, its water, plants and fish, and the macOS wallpaper app are his work, used under the MIT license; the fishing line, the medaka, the Bunny scene and the scene menu were added here. The app bundle is still called Desktop Habitats for now.
 
 Have you always wanted an aquarium? Now you can have it, right on your desktop :)
 
@@ -160,6 +164,6 @@ If you change the app's bundle ID, update `com.chaselean.desktop-habitats` in `w
 
 ## Credits and license
 
-Desktop Habitats is [MIT licensed](LICENSE). Three.js 0.180.0 is bundled under its [MIT license](vendor/THREE-LICENSE.txt).
+Cove is [MIT licensed](LICENSE). It started from [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats), copyright Chase Lean, also MIT; his notice is kept in the LICENSE file alongside ours. Three.js 0.180.0 is bundled under its [MIT license](vendor/THREE-LICENSE.txt).
 
 The rock, wood and sand textures come from Poly Haven under [CC0](https://polyhaven.com/license): [Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry), [Rough Wood](https://polyhaven.com/a/rough_wood) and [Sand 01](https://polyhaven.com/a/sand_01).

@@ -1,9 +1,9 @@
 {
-  "name": "desktop-habitats",
-  "version": "1.0.0",
+  "name": "cove",
+  "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Living desktop scenes for macOS, starting with Riverscape, a freshwater aquarium.",
+  "description": "Living desktop scenes for macOS: a fishable aquarium and a broom-chasing rabbit. Built on Desktop Habitats by Chase Lean.",
   "scripts": {
     "start": "node serve.mjs",
     "wallpaper": "sh wallpaper/install.sh",
