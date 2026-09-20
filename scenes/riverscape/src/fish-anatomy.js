@@ -834,6 +834,10 @@ export function applySkin(shader) {
       varying vec3 vSkinPoint;
       varying vec2 vFishUV;
       varying float vFishPart;
+      // 0 bloodfin tetra; 1 and 2 the owner's medaka, orange-red 楊貴妃 and yellow 幹之.
+      // A medaka's colour is carotenoid in the skin over muscle that passes light, with
+      // no guanine mirror on the flank, so it is shaded as tinted translucent tissue.
+      varying float vFishVariant;
 
       // What the tissue under this fragment passes: set once the anatomy is known, read
       // back by every light below.
@@ -1013,6 +1017,47 @@ export function applySkin(shader) {
           * (1.0 - fishAxialShadow(fishX, fishY));
         gFishThrough = fishThrough(path, vec3(0.0)) * wall
           + vec3(0.24, 0.055, 0.038) * gill;
+
+        if (vFishVariant > 0.5) {
+          float yellow = step(1.5, vFishVariant);
+          // Pigment is densest over the dorsum and thins toward a pale belly. The
+          // 楊貴妃 runs from a deep red back to a translucent orange flank; the 幹之 is
+          // a warm yellow all over with a paler yellow-white belly.
+          vec3 dorsum = mix(vec3(0.560, 0.080, 0.010), vec3(0.640, 0.390, 0.030), yellow);
+          vec3 flank = mix(vec3(0.840, 0.200, 0.030), vec3(0.900, 0.600, 0.070), yellow);
+          vec3 belly = mix(vec3(0.900, 0.480, 0.240), vec3(0.920, 0.760, 0.400), yellow);
+          vec3 medaka = mix(dorsum, flank, smoothstep(0.05, 0.30, fishBand));
+          medaka = mix(medaka, belly, smoothstep(0.55, 0.90, fishBand) * bellyReach);
+          // Less pigment over the caudal muscle: the peduncle clears a little.
+          medaka = mix(medaka, medaka * vec3(1.0, 1.25, 1.6),
+            (1.0 - smoothstep(-0.27, -0.05, fishX)) * 0.30);
+          // The 幹之 strain carries a guanine strip along the dorsal midline.
+          float strip = yellow * (1.0 - smoothstep(0.0, 0.07, fishBand))
+            * smoothstep(-0.25, 0.05, fishX);
+          medaka = mix(medaka, vec3(0.760, 0.730, 0.560), strip * 0.75);
+          // Scales and the gill chamber showing through, as on the tetra.
+          medaka *= 1.0 + (fishHash(floor(grid)) - 0.5) * 0.10 * mask - rim * 0.05 * mask;
+          medaka = mix(medaka, vec3(0.450, 0.060, 0.030), gill * 0.35);
+          // Head: darker over the skull roof, the opercular seam, mouth cleft and an
+          // orange-gold ring around the orbit.
+          medaka = mix(medaka, dorsum * 0.85,
+            smoothstep(0.250, 0.330, fishX) * (1.0 - smoothstep(0.10, 0.35, fishBand)) * 0.7);
+          medaka *= 1.0 - 0.45 * exp(-pow(margin / 0.0028, 2.0)) * opercleFace;
+          medaka *= 1.0 + 0.18 * exp(-pow((margin - 0.008) / 0.005, 2.0)) * opercleFace;
+          medaka = mix(medaka, vec3(0.060, 0.022, 0.012), cleft * 0.8);
+          medaka = mix(medaka, mix(vec3(0.640, 0.340, 0.100), vec3(0.700, 0.560, 0.200), yellow),
+            ring * 0.8);
+          diffuseColor.rgb = medaka;
+
+          // No reflector: the whole flank leaks, and the carotenoid takes green and blue
+          // out of what comes through, so a backlit medaka glows orange or amber.
+          vec3 carotenoid = mix(vec3(0.15, 1.60, 2.60), vec3(0.05, 0.45, 2.40), yellow)
+            * (1.0 - 0.5 * smoothstep(0.55, 0.95, fishBand));
+          gFishThrough = fishThrough(path, carotenoid) * 1.15
+            * (1.0 - max(fishHead, fishCavity(fishX, fishBand)))
+            * (1.0 - fishAxialShadow(fishX, fishY))
+            + vec3(0.24, 0.055, 0.038) * gill;
+        }
       } else if (vFishPart < 6.5 || vFishPart > 11.5) {
         float caudal = 1.0 - step(1.5, vFishPart);
         float pectoral = step(3.5, vFishPart) * (1.0 - step(5.5, vFishPart));
@@ -1034,6 +1079,18 @@ export function applySkin(shader) {
         diffuseColor.rgb = mix(membrane, vec3(0.400, 0.052, 0.020), pigment);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.400, 0.410, 0.380),
           paleTip * smoothstep(0.76, 0.98, span) * 0.7);
+        vec3 finPigment = FISH_FIN_PIGMENT;
+        if (vFishVariant > 0.5) {
+          // Medaka have no adipose fin. Their fins are hyaline with the body's
+          // carotenoid carried a short way out from the base, furthest in the tail.
+          if (vFishPart > 11.5) discard;
+          float yellow = step(1.5, vFishVariant);
+          pigment = (1.0 - smoothstep(0.0, 0.95, span))
+            * mix(0.30, 0.50, caudal) * mix(1.0, 0.40, pectoral);
+          diffuseColor.rgb = mix(membrane,
+            mix(vec3(0.720, 0.170, 0.030), vec3(0.820, 0.550, 0.070), yellow), pigment);
+          finPigment = mix(FISH_FIN_PIGMENT, vec3(0.05, 0.50, 2.40), yellow);
+        }
 
         // Each soft ray branches twice on its way to the margin, so the ribbing
         // doubles and then doubles again over the outer half of the fin.
@@ -1052,7 +1109,7 @@ export function applySkin(shader) {
         // Hyaline membrane: thin enough that most of the light carries straight through
         // it rather than scattering back, which is what keeps a fin see-through.
         gFishThrough = fishThrough(${glsl(MEMBRANE_THICKNESS)},
-          FISH_FIN_PIGMENT * pigment + ${glsl(FIN_RAY_DENSITY)} * ribs);
+          finPigment * pigment + ${glsl(FIN_RAY_DENSITY)} * ribs);
         #ifdef FISH_MEMBRANE
           // Thickness falls away toward the free margin; pigment and rays add body.
           float thickness = mix(1.0, mix(0.34, 0.50, caudal), smoothstep(0.06, 1.0, span));
@@ -1093,6 +1150,12 @@ export function applySkin(shader) {
         metalnessFactor = clamp(0.06 + 0.36 * max(scaled, plate), 0.0, 0.44);
         metalnessFactor *= smoothstep(-0.292, -0.248, fishX);
         metalnessFactor *= 1.0 - 0.85 * smoothstep(0.88, 1.06, fishOrbit());
+        if (vFishVariant > 0.5) {
+          // Carotenoid skin is dielectric. Only the 幹之 strain's dorsal strip mirrors.
+          float strip = step(1.5, vFishVariant) * (1.0 - smoothstep(0.0, 0.07, fishBand))
+            * smoothstep(-0.25, 0.05, fishX);
+          metalnessFactor = mix(0.04, 0.40, strip);
+        }
       } else if (vFishPart > 6.5 && vFishPart < 7.5) {
         metalnessFactor = 0.20;
       } else if (vFishPart < 6.5 || vFishPart > 11.5) {
@@ -1114,6 +1177,10 @@ export function applySkin(shader) {
         roughnessFactor = mix(roughnessFactor, 0.44, smoothstep(0.60, 0.94, fishBand));
         float grain = fishHash(floor(vSkinPoint.xy * 260.0));
         roughnessFactor *= 1.0 + (grain - 0.5) * 0.26 * fishHead;
+        if (vFishVariant > 0.5) {
+          // Matte skin with a wet sheen, no field of scale mirrors.
+          roughnessFactor = 0.36 + (fishHash(floor(fishScaleGrid())) - 0.5) * 0.10;
+        }
         roughnessFactor = mix(roughnessFactor, 0.06, 1.0 - smoothstep(0.86, 1.04, fishOrbit()));
       } else if (vFishPart > 6.5 && vFishPart < 7.5) {
         roughnessFactor = 0.34;
@@ -1160,7 +1227,7 @@ export function applySkin(shader) {
       #endif
       #ifdef USE_IRIDESCENCE
         // Thin-film interference over the guanine stack, mottled scale by scale.
-        float sheenBand = vFishPart < 0.5
+        float sheenBand = vFishPart < 0.5 && vFishVariant < 0.5
           ? fishReflector(fishBand, fishX) * smoothstep(-0.30, -0.22, fishX)
           : 0.0;
         material.iridescence *= 0.12 + sheenBand * 0.88;

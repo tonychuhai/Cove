@@ -10,6 +10,15 @@ import {
 } from "./fish-anatomy.js";
 
 export const COUNT = 24;
+// Which fish in the shoal are the owner's own medaka (Oryzias latipes, 青鳉) rather than
+// the bloodfin tetra the scene was built around: 0 tetra, 1 the orange-red 楊貴妃
+// strain, 2 the yellow 幹之 strain. Read per instance by the skin shader. Assigned by
+// id so the seeded random sequence the behaviour runs on is left untouched, and they
+// keep the tetra's size range: the feeding distances are tuned to that body length.
+export const VARIANTS = [
+  0, 1, 0, 0, 1, 0, 2, 0, 1, 0, 0, 1,
+  0, 2, 1, 0, 0, 2, 0, 1, 0, 0, 1, 0,
+];
 // The whole water column the fish may use. The floor is the sand, tracked separately.
 export const BOUNDS = {
   minX: -8.3,
@@ -278,6 +287,20 @@ const STRIKE = {
   puff: 0.32,
   handling: [0.4, 0.9],
 };
+// A fish on the line. The bait is a fat red worm, seen from further off than a pellet.
+// Hooked, the fish first runs against the line, pulling the hook with it, then tires and
+// is hauled up to hang head-up under the hook, still thrashing. Thrash is the tail-beat
+// rate of the struggle in hertz; pull is how hard a fresh fish drags the hook, in the
+// line's spring units. A fish that comes off the hook, or is dropped back in after being
+// landed, bolts and wants nothing to do with food for a while.
+const HOOKED = {
+  sight: 1.6,
+  thrash: 5.2,
+  pull: 55,
+  turn: [0.25, 0.7],
+  swing: [0.6, 1.8],
+  wary: 2.5,
+};
 
 // Integrate the spine's tangent, preserving body length. A travelling angular wave
 // builds along the trunk and peduncle; the head counter-moves only slightly.
@@ -287,9 +310,11 @@ const SWIM_GLSL = /* glsl */ `
   attribute float aFinPhase;
   attribute float aPart;
   attribute float aFinProgress;
+  attribute float aVariant;
   varying vec3 vSkinPoint;
   varying vec2 vFishUV;
   varying float vFishPart;
+  varying float vFishVariant;
   const float PIVOT = 0.12;
   vec3 gSwimPosition;
   float spineAngle(float s) {
@@ -358,6 +383,7 @@ function applySwimming(material, withColor = true) {
           vSkinPoint = position;
           vFishUV = uv;
           vFishPart = aPart;
+          vFishVariant = aVariant;
         `,
         );
       applySkin(shader);
@@ -372,7 +398,7 @@ function applySwimming(material, withColor = true) {
     }
   };
   material.customProgramCacheKey = () =>
-    `riverscape-fish-${withColor ? "skin" : "depth"}-4`;
+    `riverscape-fish-${withColor ? "skin" : "depth"}-5`;
 }
 
 function clampToBox(position, box, margin = 0) {
@@ -408,7 +434,7 @@ function rotateAboutY(v, angle) {
 
 export function createFishSchool(
   scene,
-  { obstacles = [], landmarks = [], thickets = [], food = null } = {},
+  { obstacles = [], landmarks = [], thickets = [], food = null, tackle = null } = {},
 ) {
   const random = randomGenerator(583137);
   const range = (min, max) => min + random() * (max - min);
@@ -421,12 +447,17 @@ export function createFishSchool(
   const finPhaseAttribute = new THREE.InstancedBufferAttribute(
     new Float32Array(COUNT), 1,
   );
+  const variantAttribute = new THREE.InstancedBufferAttribute(
+    Float32Array.from({ length: COUNT }, (_, id) => VARIANTS[id] ?? 0), 1,
+  );
   swimAttribute.setUsage(THREE.DynamicDrawUsage);
   finPhaseAttribute.setUsage(THREE.DynamicDrawUsage);
   geometry.body.setAttribute("aSwim", swimAttribute);
   geometry.fins.setAttribute("aSwim", swimAttribute);
   geometry.body.setAttribute("aFinPhase", finPhaseAttribute);
   geometry.fins.setAttribute("aFinPhase", finPhaseAttribute);
+  geometry.body.setAttribute("aVariant", variantAttribute);
+  geometry.fins.setAttribute("aVariant", variantAttribute);
   const { skin: skinMaterial, fins: finMaterial } = createFishMaterials();
   const depthMaterial = new THREE.MeshDepthMaterial({
     depthPacking: THREE.RGBADepthPacking,
@@ -496,6 +527,7 @@ export function createFishSchool(
       anchor: position.clone(),
       goal: position.clone(),
       quaternion: new THREE.Quaternion(),
+      variant: VARIANTS[id] ?? 0,
       scale: range(0.83, 1.08),
       phase: range(0, TAU),
       character: range(0.8, 1.2),
@@ -542,6 +574,8 @@ export function createFishSchool(
       splashSlot: 0,
       recruiter: null,
       recruitAt: 0,
+      // The fight, while the fish is on the line.
+      fight: null,
     };
   });
   const delta = new THREE.Vector3();
@@ -825,6 +859,12 @@ export function createFishSchool(
       f.attempts++;
       return;
     }
+    // The bait: the jaws close on the hook with it.
+    if (pellet.hook) {
+      if (tackle && tackle.caught(f)) hooked(f);
+      else abandon(f, true);
+      return;
+    }
     // Another fish's jaws may have been a frame ahead of these.
     if (!food.take(pellet)) return;
     bites++;
@@ -924,17 +964,22 @@ export function createFishSchool(
     // A fish deep in the tank does not rocket to the film for a floating pellet, though
     // one already worked up will come further up for it.
     const rise = THREE.MathUtils.lerp(FEED.rise[0], FEED.rise[1], f.foraging);
-    for (const pellet of food.pellets) {
-      if (pellet.gone) continue;
+    const consider = (pellet) => {
+      if (pellet.gone) return;
       scan.subVectors(pellet.position, f.position);
-      const d = scan.length();
-      if (d > closest) continue;
-      if (f.heading.dot(scan) < SENSES.blindCosine * d) continue;
-      if (food.floating(pellet) && f.position.y < rise) continue;
+      // The bait is a worm, not a millimetre of pellet: it is seen from further away.
+      const d = scan.length() / (pellet.hook ? HOOKED.sight : 1);
+      if (d > closest) return;
+      if (f.heading.dot(scan) < SENSES.blindCosine * scan.length()) return;
+      if (food.floating(pellet) && f.position.y < rise) return;
       best = pellet;
       closest = d;
-    }
+    };
+    for (const pellet of food.pellets) consider(pellet);
+    if (tackle) consider(tackle.bait);
     if (!best || best === f.food) return;
+    // The shoal has just seen one of its own taken off the bait, and is shy of it.
+    const wary = best.hook ? tackle.lure : 1;
     // A pellet lying on the sand has the substrate's own texture behind it and no
     // silhouette, and a fish that has stopped thinking about food is not looking down
     // for one. It stays edible, but only for a fish that is still interested and happens
@@ -945,7 +990,7 @@ export function createFishSchool(
     // fish's own scan. A radius test would have the whole shoal commit on one frame,
     // which is the single most artificial thing this feature could do.
     const seeing =
-      FEED.rate * f.appetite * looking * smoothstep(FEED.sight, FEED.near, closest);
+      FEED.rate * f.appetite * looking * wary * smoothstep(FEED.sight, FEED.near, closest);
     if (random() > 1 - Math.exp(-seeing * interval)) return;
     rouse(f, FEED.sightDrive);
     forage(f, best);
@@ -998,10 +1043,16 @@ export function createFishSchool(
     );
     f.until = elapsed + CSTART.stage1 + CSTART.stage2 + burst;
     escapes++;
+    spreadAlarm(f);
+  }
+
+  // The neighbours' share of a startle, in roughly the direction `flight` holds.
+  function spreadAlarm(f) {
     for (const other of fish) {
       if (
         other === f ||
         other.mode === "escape" ||
+        other.mode === "hooked" ||
         other.pendingEscape ||
         elapsed < other.refractoryUntil
       )
@@ -1030,9 +1081,11 @@ export function createFishSchool(
     if (d > THREAT.range || d < 1e-3) return;
     target.multiplyScalar(1 / d);
     const seen = f.heading.dot(target) > SENSES.blindCosine;
-    // Closing speed over distance: the rate the object grows in the fish's eye.
+    // Closing speed over distance: the rate the object grows in the fish's eye. A hook
+    // on a line is a far smaller thing than a hand at the glass: it has to come at a fish
+    // much faster to startle it, and nobody keeps clear of it when it is merely near.
     const looming = -pointer.velocity.dot(target) / Math.max(d, 0.4);
-    const threshold = THREAT.looming * (1 + f.alarm);
+    const threshold = THREAT.looming * (1 + f.alarm) * (pointer.hook ? 2.2 : 1);
     if (
       seen &&
       looming > threshold &&
@@ -1046,6 +1099,7 @@ export function createFishSchool(
       return;
     }
     // Something merely close is given room, less and less as it becomes familiar.
+    if (pointer.hook) return;
     const zone = THREAT.flightZone / (1 + f.alarm);
     if (d < zone) {
       f.alarm += dt * THREAT.familiarity;
@@ -1056,6 +1110,136 @@ export function createFishSchool(
         clampToBox(f.anchor, BOUNDS, 0.5);
       }
     }
+  }
+
+  // Something has hit the film: the loudest thing that happens in a quiet tank, and the
+  // first thing anyone notices. Heads turn across the near half of the water before a
+  // single fish has swum anywhere, and the odour plume starts from here.
+  function splashAt(point) {
+    const slot = splashSlot;
+    const splash = splashes[slot];
+    splashSlot = (splashSlot + 1) % splashes.length;
+    splash.point.copy(point);
+    splash.at = elapsed;
+    shelteredVelocity(splash.point, waterClock, wash, thickets);
+    splash.speed = wash.length();
+    for (const f of fish) {
+      if (f.splashAt || f.mode === "escape" || f.mode === "feed" || f.mode === "hooked")
+        continue;
+      const d = f.position.distanceTo(splash.point);
+      if (d > FEED.splash) continue;
+      f.splashSlot = slot;
+      // Further away is slower off the mark, as a weaker wave is.
+      f.splashAt =
+        elapsed +
+        THREE.MathUtils.lerp(FEED.splashLatency[0], FEED.splashLatency[1], d / FEED.splash);
+    }
+  }
+
+  // The body deformation and the instance transform, from heading, bend and the swimming
+  // state. The same for a fish swimming free and one on the line.
+  function pose(f) {
+    swimAttribute.setXYZW(f.id, f.phase, f.effort * GAIT.waveAngle, -f.bend, f.finBrake);
+    finPhaseAttribute.setX(f.id, f.finPhase);
+    axisZ.crossVectors(f.heading, UP).normalize();
+    axisY.crossVectors(axisZ, f.heading).normalize();
+    basis.makeBasis(f.heading, axisY, axisZ);
+    targetQuaternion.setFromRotationMatrix(basis);
+    bankQuaternion.setFromAxisAngle(
+      FORWARD,
+      -THREE.MathUtils.clamp(f.bend, -1.8, 1.8) * 0.08,
+    );
+    targetQuaternion.multiply(bankQuaternion);
+    f.quaternion.copy(targetQuaternion);
+    scale.setScalar(f.scale);
+    instance.compose(f.position, f.quaternion, scale);
+    bodies.setMatrixAt(f.id, instance);
+    membranes.setMatrixAt(f.id, instance);
+  }
+
+  // The jaws have closed on the hook. Nothing else the fish was doing survives this, and
+  // the thrashing that follows startles the shoal around it as a C-start would.
+  function hooked(f) {
+    f.mode = "hooked";
+    f.food = null;
+    f.strikeUntil = 0;
+    f.attempts = 0;
+    f.interest = null;
+    f.recruiter = null;
+    f.pendingEscape = null;
+    f.flick = null;
+    f.stroke = null;
+    f.until = Infinity;
+    f.fight = {
+      at: elapsed,
+      yaw: yawOf(f.heading),
+      sign: random() < 0.5 ? -1 : 1,
+      turnAt: elapsed + range(HOOKED.turn[0], HOOKED.turn[1]),
+    };
+    flight.set(f.heading.x, 0, f.heading.z).normalize();
+    spreadAlarm(f);
+  }
+
+  // On the line. The mouth stays on the hook; the body runs against it while the fish is
+  // fresh, dragging the hook with it, and swings up to hang head-up under the hook as it
+  // tires. The tail beats hard the whole time and the body whips side to side.
+  function fight(f, dt) {
+    const { position, heading, fight } = f;
+    const hook = tackle.hook.position;
+    const struggle = tackle.struggle;
+    const tired = 1 - struggle;
+    if (elapsed >= fight.turnAt) {
+      fight.sign = -fight.sign;
+      fight.yaw += fight.sign * range(HOOKED.swing[0], HOOKED.swing[1]);
+      fight.turnAt = elapsed + range(HOOKED.turn[0], HOOKED.turn[1]) / (0.3 + struggle);
+    }
+    const beat = Math.sin(elapsed * TAU * HOOKED.thrash * (0.55 + 0.45 * struggle) + f.seed);
+    const yaw = fight.yaw + beat * 0.45 * struggle;
+    // Level while running, near vertical once hauled up, never quite still.
+    const pitch =
+      THREE.MathUtils.lerp(0.12, 1.22, smoothstep(0.05, 0.85, tired)) +
+      beat * 0.1 * struggle;
+    setHeading(heading, yaw, pitch);
+    delta.copy(position);
+    position.copy(hook).addScaledVector(heading, -SNOUT_X * f.scale);
+    f.velocity.subVectors(position, delta).multiplyScalar(1 / Math.max(dt, 1e-3));
+    f.swim.copy(f.velocity);
+    f.anchor.copy(position);
+    // What the fish does to the line: it drives forward into the hook.
+    tackle.pull
+      .copy(heading)
+      .multiplyScalar(HOOKED.pull * struggle * (0.55 + 0.45 * Math.abs(beat)));
+    // A hard, fast tail and a body whipping into alternate C-bends.
+    f.phase = (f.phase + dt * TAU * (4 + 4 * struggle)) % TAU;
+    f.effort = THREE.MathUtils.lerp(f.effort, 0.35 + 0.65 * struggle, 1 - Math.exp(-dt * 12));
+    f.bend = beat * (0.6 + 2.0 * struggle);
+    f.finBrake = THREE.MathUtils.lerp(f.finBrake, 0.7, 1 - Math.exp(-dt * 6));
+    f.finPhase = (f.finPhase + dt * TAU * 3.5) % TAU;
+  }
+
+  // Off the hook: thrown or torn free in the water, or dropped back in from the top of
+  // the frame after being landed. Either way the fish bolts, downward and away, and is
+  // in no mood for food for a good while.
+  function freed(f, how) {
+    const hook = tackle.hook.position;
+    f.fight = null;
+    f.alarm += HOOKED.wary;
+    f.appetite = APPETITE.floor;
+    f.keen = f.searching = f.foraging = 0;
+    if (how === "landed") {
+      f.position.set(
+        THREE.MathUtils.clamp(hook.x + range(-0.3, 0.3), BOUNDS.minX + 0.6, BOUNDS.maxX - 0.6),
+        BOUNDS.maxY - 0.1,
+        THREE.MathUtils.clamp(tackle.hookZ + range(-0.5, 0.1), BOUNDS.minZ + 0.6, BOUNDS.maxZ - 0.6),
+      );
+      setHeading(f.heading, range(0, TAU), -0.9);
+      f.swim.copy(f.heading).multiplyScalar(1.5);
+    } else f.swim.copy(f.velocity).clampLength(0, 2);
+    f.mode = "settle";
+    delta.set(range(-1, 1), -1.4, range(-0.6, 0.6));
+    if (how !== "landed") delta.addScaledVector(f.heading, 0.8);
+    startEscape(f, delta.normalize());
+    f.refractoryUntil = elapsed + CSTART.refractory * 2;
   }
 
   function decide(f) {
@@ -1092,29 +1276,26 @@ export function createFishSchool(
       for (const pellet of food.pellets) {
         if (pellet.serial <= newestPellet) continue;
         newestPellet = pellet.serial;
-        const slot = splashSlot;
-        const splash = splashes[slot];
-        splashSlot = (splashSlot + 1) % splashes.length;
-        splash.point.copy(pellet.position);
-        splash.at = elapsed;
-        shelteredVelocity(splash.point, time, wash, thickets);
-        splash.speed = wash.length();
-        for (const f of fish) {
-          if (f.splashAt || f.mode === "escape" || f.mode === "feed") continue;
-          const d = f.position.distanceTo(splash.point);
-          if (d > FEED.splash) continue;
-          f.splashSlot = slot;
-          // Further away is slower off the mark, as a weaker wave is.
-          f.splashAt =
-            elapsed +
-            THREE.MathUtils.lerp(
-              FEED.splashLatency[0],
-              FEED.splashLatency[1],
-              d / FEED.splash,
-            );
-        }
+        splashAt(pellet.position);
       }
+    // The bait going in, or a landed fish dropped back, is a splash like any other.
+    if (tackle) {
+      if (tackle.splashed) {
+        tackle.splashed = false;
+        splashAt(tackle.hook.position);
+      }
+      if (tackle.released) {
+        const { fish: f, how } = tackle.released;
+        tackle.released = null;
+        if (f.mode === "hooked") freed(f, how);
+      }
+    }
     for (const f of fish) {
+      if (f.mode === "hooked") {
+        fight(f, dt);
+        pose(f);
+        continue;
+      }
       const { position, swim, heading } = f;
       shelteredVelocity(position, time, water, thickets);
       const bed = thicketAt(thickets, position);
@@ -1630,29 +1811,7 @@ export function createFishSchool(
       f.finBrake = THREE.MathUtils.lerp(f.finBrake, pectorals, 1 - Math.exp(-dt * 6));
       if (f.stroke || flick) f.phase = (f.phase + dt * TAU * frequency) % TAU;
       f.finPhase = (f.finPhase + dt * TAU * (2.1 + f.effort * 1.5)) % TAU;
-      swimAttribute.setXYZW(
-        f.id,
-        f.phase,
-        f.effort * GAIT.waveAngle,
-        -f.bend,
-        f.finBrake,
-      );
-      finPhaseAttribute.setX(f.id, f.finPhase);
-
-      axisZ.crossVectors(heading, UP).normalize();
-      axisY.crossVectors(axisZ, heading).normalize();
-      basis.makeBasis(heading, axisY, axisZ);
-      targetQuaternion.setFromRotationMatrix(basis);
-      bankQuaternion.setFromAxisAngle(
-        FORWARD,
-        -THREE.MathUtils.clamp(f.bend, -1.8, 1.8) * 0.08,
-      );
-      targetQuaternion.multiply(bankQuaternion);
-      f.quaternion.copy(targetQuaternion);
-      scale.setScalar(f.scale);
-      instance.compose(position, f.quaternion, scale);
-      bodies.setMatrixAt(f.id, instance);
-      membranes.setMatrixAt(f.id, instance);
+      pose(f);
     }
     bodies.instanceMatrix.needsUpdate = true;
     membranes.instanceMatrix.needsUpdate = true;
@@ -1666,7 +1825,9 @@ export function createFishSchool(
     update,
     fish,
     getTelemetry() {
-      const states = { hover: 0, travel: 0, settle: 0, inspect: 0, feed: 0, escape: 0 };
+      const states = {
+        hover: 0, travel: 0, settle: 0, inspect: 0, feed: 0, escape: 0, hooked: 0,
+      };
       let twitching = 0,
         totalSpeed = 0,
         maximumSpeed = 0,
@@ -1690,6 +1851,7 @@ export function createFishSchool(
         foraging,
         strikes,
         bites,
+        fishing: tackle ? { ...tackle.stats, state: tackle.state } : null,
         simulationTime: elapsed,
       };
     },

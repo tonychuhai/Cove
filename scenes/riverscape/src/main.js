@@ -3,6 +3,7 @@ import { createEnvironment, createParticles } from "./environment.js";
 import { createPlants } from "./plants.js";
 import { createFishSchool } from "./fish.js";
 import { createFood } from "./food.js";
+import { createTackle } from "./tackle.js";
 import { randomGenerator } from "./math.js";
 import { waterTime } from "./water.js";
 import { createFrameLoop } from "./frame-loop.js";
@@ -154,11 +155,14 @@ async function start() {
     ...settings, animatedShadows: profile !== "reference",
   });
   const food = createFood(scene, { thickets: plants.thickets });
+  // The cursor is a baited hook on a line. The fish take it as food; see tackle.js.
+  const tackle = createTackle(scene, { camera });
   const fish = createFishSchool(scene, {
     obstacles,
     landmarks,
     thickets: plants.thickets,
     food,
+    tackle,
   });
   const particles = createParticles(scene, { thickets: plants.thickets });
 
@@ -275,6 +279,9 @@ async function start() {
         pointer = {
           position: pointerPosition.clone(),
           velocity: new THREE.Vector3(),
+          // A hook on a line, not a hand at the glass: the fish come to it rather than
+          // keeping clear of it.
+          hook: true,
         };
       lastPointerTime = now;
     }
@@ -282,6 +289,12 @@ async function start() {
   canvas.addEventListener("pointerleave", () => {
     pointer = null;
   });
+  // In a browser the hook stands in for the cursor while the scene is running; a paused
+  // preview gets the arrow back, since the hook would not follow it.
+  const showCursor = () => {
+    canvas.style.cursor = paused || requestedRate === 0 ? "" : "none";
+  };
+  showCursor();
 
   // Clicking the water drops a pinch of food where the click was. The ray is cast again
   // here rather than reusing the hovering pointer, because a touch or a pen presses
@@ -301,6 +314,8 @@ async function start() {
       camera,
     );
     if (raycaster.ray.intersectPlane(waterPlane, dropPoint)) food.drop(dropPoint);
+    // A click also puts a fresh worm on a bare hook.
+    tackle.rebait();
   });
   // The same pinch without a click, for the wallpaper's menu: the cursor is up in the
   // menu bar at that moment, so the food goes over the open middle of the tank instead,
@@ -323,6 +338,7 @@ async function start() {
       event.preventDefault();
       paused = !paused;
       loop?.setPaused(paused);
+      showCursor();
     }
     if (event.key.toLowerCase() === "f") fullscreen();
   });
@@ -344,6 +360,8 @@ async function start() {
       time += step;
       waterTime.value = time;
       food.update(step, time);
+      // The line moves first, so a hooked fish is posed on where the hook is now.
+      tackle.update(step, pointer);
       fish.update(step, time, pointer);
     }
     if (pointer && now - lastPointerTime > 60)
@@ -378,6 +396,7 @@ async function start() {
     renderedFrames, shadowFrames, simulationTime: time,
     drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
     plants: { ...plants.stats }, loop: loop.state,
+    fishing: { ...tackle.stats, state: tackle.state, baited: tackle.baited },
   });
   // Diagnostics are opt-in: no timing queries, synchronization or arrays in normal use.
   if (query.get("diagnostics") === "1") {
