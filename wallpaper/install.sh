@@ -32,9 +32,12 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/scene/scenes"
 cp "$build/Desktop Habitats" "$app/Contents/MacOS/Desktop Habitats"
 cp "$here/Info.plist" "$app/Contents/Info.plist"
-cp -R "$project/scenes/riverscape" "$app/Contents/Resources/scene/scenes/"
+for scene in "$project"/scenes/*/; do
+	# Without the trailing slash, or cp would pour the folder's contents into scenes/.
+	cp -R "${scene%/}" "$app/Contents/Resources/scene/scenes/"
+done
 cp -R "$project/vendor" "$app/Contents/Resources/scene/"
-rm -rf "$app/Contents/Resources/scene/scenes/riverscape/tests"
+rm -rf "$app/Contents/Resources/scene/scenes/"*/tests
 codesign --force --sign - "$app" >/dev/null 2>&1 || true
 
 mkdir -p "$(dirname "$agent")"

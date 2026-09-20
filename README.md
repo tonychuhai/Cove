@@ -4,9 +4,9 @@
 
 Have you always wanted an aquarium? Now you can have it, right on your desktop :)
 
-The fish react to your cursor and compete for food, while the plants sway in a slow current. I plan to add more environments soon. For now, there is only Riverscape, a planted freshwater aquarium.
+The fish react to your cursor and compete for food, while the plants sway in a slow current. There are two scenes: **Riverscape**, a planted freshwater aquarium, and **Bunny**, a lop rabbit in a sunny room whose cursor is a broom — wave it and the rabbit chases and bites it. Switch between them from the menu bar.
 
-The scene is rendered live with Three.js and WebGL2. Everything runs locally, with no account or internet connection needed after setup. Desktop wallpaper support is **macOS only** for now; you can also try Riverscape in a browser. The app opens Riverscape directly.
+The scenes are rendered live with Three.js and WebGL2. Everything runs locally, with no account or internet connection needed after setup. Desktop wallpaper support is **macOS only** for now; you can also try either scene in a browser.
 
 ## Install on Mac
 
@@ -30,13 +30,20 @@ You don't need Node.js for the wallpaper. If you already have it, `npm run wallp
 
 ## Use the wallpaper
 
-Click the fish icon in the menu bar:
+Click the fish (or hare) icon in the menu bar:
 
-- **Feed** drops ten pellets into each screen's tank. Uneaten pellets dissolve after 20–40 seconds of running simulation time, measured from when they touch the water.
+- **Feed** drops ten pellets into each screen's tank, or puts a carrot down for the rabbit. Uneaten pellets dissolve after 20–40 seconds of running simulation time, measured from when they touch the water.
 - **Pause / Resume** controls the animation. Your choice is remembered across restarts.
+- **Scene** switches between Riverscape and Bunny. The choice is remembered.
 - **Quit** closes the app until you open it again or next sign in.
 
+### Bunny
+
+The cursor is a small broom. Wave it about and the rabbit's interest rises until it gives chase: it hops after the broom, leaps for the head, bites, hangs on and shakes it, then lets go and comes back for more. Three bites in a row and it is pleased with itself for a moment. A still broom nearby gets sniffed at; a slow stroke across the rabbit is petting (hearts); left alone it grooms, wanders and eventually flops down to sleep in the sun. The panel shows closeness and mood, which grow with feeding, petting and play and are remembered between runs.
+
 Move your cursor near the fish to see them react. Desktop icons, clicks and dragging work as usual. To feed the fish, use the menu; clicking the desktop does not drop food.
+
+The cursor is also a fishing line: a baited hook hangs wherever the pointer is. Hold it still near the fish and one will take the bait. A hooked fish runs and thrashes for a few seconds; lift it to the top of the screen and hold it there to land it, and it is let go back into the water. Jerk the cursor and the fish tears free. A bare hook is rebaited by lifting it out of the water for a moment (or, left in the water, on its own after a while). The system cursor itself stays as it is; the hook is drawn in the scene under it.
 
 ## FAQ
 
@@ -112,10 +119,10 @@ With Node.js 20 or newer, run this from the project folder:
 npm start
 ```
 
-Open [the local preview](http://127.0.0.1:8080). There is no `npm install` step; the library is included. Use `PORT=8081 npm start` if port 8080 is busy, and Ctrl+C to stop the server.
+Open [the local preview](http://127.0.0.1:8080) for Riverscape, or `/scenes/bunny/` for the rabbit. There is no `npm install` step; the library is included. Use `PORT=8081 npm start` if port 8080 is busy, and Ctrl+C to stop the server.
 
-- Click the water to drop food.
-- Move the pointer near the fish to interact.
+- Click the water to drop food, and to rebait a bare hook.
+- Move the pointer near the fish to interact. The pointer is the hook and line; the browser's own cursor is hidden while the scene is running.
 - Press **Space** to pause or resume, and **F** for fullscreen.
 
 Reduce Motion starts the preview paused. Serve the page over HTTP; opening `index.html` directly will not load its JavaScript modules. Any static server also works, such as `python3 -m http.server 8080 --bind 127.0.0.1` if you have Python installed.
@@ -124,7 +131,7 @@ Reduce Motion starts the preview paused. Serve the page over HTTP; opening `inde
 
 One water model drives the plants, drifting particles, fish and underwater lighting. Fish alternate between swimming and coasting, explore the tank, avoid neighbours and compete for pellets. The scene uses raster rendering with custom GLSL shaders, shadows and depth effects.
 
-Riverscape lives in `scenes/riverscape/`, including its textures and tests. Future scenes can live alongside it. The Mac app currently loads Riverscape directly; there is no scene picker or plugin system.
+Riverscape lives in `scenes/riverscape/`, including its textures and tests, and Bunny in `scenes/bunny/` (`scene.js` the room, `rabbit.js` the rabbit and its behaviour, `broom.js` the cursor, `pet-state.js` what it remembers). The Mac app lists the scenes in `wallpaper/Wallpaper.swift` and shows the chosen one; a scene keeps its state through the app's `state` message handler, since the wallpaper's web view stores nothing itself.
 
 | Files | Purpose |
 | --- | --- |

@@ -16,7 +16,56 @@ import IOKit.ps
 
 let sceneScheme = "desktop-habitats"
 let sceneHost = "local"
-let scenePage = "/scenes/riverscape/wallpaper.html"
+
+/// The scenes the app can show. Each lives in scenes/<id>/ with a wallpaper.html; the
+/// choice is kept in UserDefaults and survives a restart.
+struct Habitat {
+  let id: String
+  let title: String
+  let symbol: String
+}
+let habitats = [
+  Habitat(id: "riverscape", title: "Riverscape", symbol: "fish"),
+  Habitat(id: "bunny", title: "Bunny", symbol: "hare"),
+]
+var currentHabitat: Habitat {
+  let id = UserDefaults.standard.string(forKey: "scene") ?? habitats[0].id
+  return habitats.first { $0.id == id } ?? habitats[0]
+}
+var scenePage: String { "/scenes/\(currentHabitat.id)/wallpaper.html" }
+
+/// What a scene remembers between runs, for scenes that keep a companion: the page sends
+/// its state through the `state` message handler and gets it back as
+/// `window.habitatSavedState` on the next load. The web view itself keeps no site data.
+final class StateStore: NSObject, WKScriptMessageHandler {
+  static let shared = StateStore()
+  private static func key(_ habitat: Habitat) -> String { "petState.\(habitat.id)" }
+  func saved(for habitat: Habitat) -> String? {
+    UserDefaults.standard.string(forKey: Self.key(habitat))
+  }
+  func userContentController(
+    _ controller: WKUserContentController, didReceive message: WKScriptMessage
+  ) {
+    guard let text = message.body as? String else { return }
+    UserDefaults.standard.set(text, forKey: Self.key(currentHabitat))
+  }
+  /// A script that hands the saved state to the page before any of its own code runs.
+  func injection(for habitat: Habitat) -> WKUserScript {
+    let encoded = saved(for: habitat).flatMap { $0.data(using: .utf8)?.base64EncodedString() } ?? ""
+    return WKUserScript(
+      source: """
+        (() => {
+          const encoded = "\(encoded)";
+          if (!encoded) return;
+          try {
+            const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
+            window.habitatSavedState = new TextDecoder().decode(bytes);
+          } catch (error) { console.warn('saved state unreadable', error); }
+        })();
+        """,
+      injectionTime: .atDocumentStart, forMainFrameOnly: true)
+  }
+}
 
 /// Serves the bundled copy of the aquarium to the web view.
 final class SceneHandler: NSObject, WKURLSchemeHandler {
@@ -121,8 +170,11 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
           """,
         injectionTime: .atDocumentStart, forMainFrameOnly: true))
 
+    settings.userContentController.addUserScript(StateStore.shared.injection(for: currentHabitat))
+
     view = WKWebView(frame: screen.frame, configuration: settings)
     settings.userContentController.add(Reporter.shared, name: "report")
+    settings.userContentController.add(StateStore.shared, name: "state")
     // WebKit stops a page whose window it thinks is covered, and AppKit never reports a
     // background agent's window as visible, so the scene would never start. This asks
     // WebKit not to make that call; the agent works out what is covered instead.
@@ -162,6 +214,7 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
     view.navigationDelegate = nil
     view.configuration.userContentController.removeAllUserScripts()
     view.configuration.userContentController.removeScriptMessageHandler(forName: "report")
+    view.configuration.userContentController.removeScriptMessageHandler(forName: "state")
     view.removeFromSuperview()
     window.contentView = nil
     window.orderOut(nil)
@@ -280,6 +333,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private let state = NSMenuItem()
   private let pause = NSMenuItem()
   private let feed = NSMenuItem()
+  private let sceneMenu = NSMenuItem()
   private var applied = 0
   private var pointerTimer: Timer?
   private var pointerRate = 0
@@ -485,14 +539,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   // MARK: - The menu bar
 
-  /// The agent's only visible piece: a fish in the menu bar that can stop the water.
+  /// The agent's only visible piece: the scene's animal in the menu bar, which can stop
+  /// the scene, feed it, or swap it for another.
   private func addMenu() {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-    let symbol = NSImage(systemSymbolName: "fish", accessibilityDescription: "Desktop Habitats")
-    symbol?.isTemplate = true
-    item.button?.image = symbol
-    if symbol == nil { item.button?.title = "Desktop Habitats" }
-    item.button?.toolTip = "Desktop Habitats · Riverscape"
+    status = item
+    brandMenuBar()
 
     let menu = NSMenu()
     menu.delegate = self
@@ -510,14 +562,44 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     pause.action = #selector(togglePause)
     menu.addItem(pause)
     menu.addItem(.separator())
+    let scenes = NSMenu(title: "Scene")
+    for (index, habitat) in habitats.enumerated() {
+      let choice = NSMenuItem(title: habitat.title, action: #selector(chooseScene(_:)), keyEquivalent: "")
+      choice.target = self
+      choice.tag = index
+      scenes.addItem(choice)
+    }
+    sceneMenu.title = "Scene"
+    sceneMenu.submenu = scenes
+    menu.addItem(sceneMenu)
+    menu.addItem(.separator())
     let leave = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
     leave.target = self
     menu.addItem(leave)
     item.menu = menu
-    status = item
     if item.button?.window == nil || !item.isVisible {
       NSLog("desktop-habitats: the menu bar item did not appear")
     }
+  }
+
+  /// The menu bar icon and tooltip follow the scene.
+  private func brandMenuBar() {
+    guard let item = status else { return }
+    let habitat = currentHabitat
+    let symbol = NSImage(systemSymbolName: habitat.symbol, accessibilityDescription: "Desktop Habitats")
+      ?? NSImage(systemSymbolName: "leaf", accessibilityDescription: "Desktop Habitats")
+    symbol?.isTemplate = true
+    item.button?.image = symbol
+    if symbol == nil { item.button?.title = "Desktop Habitats" }
+    item.button?.toolTip = "Desktop Habitats · \(habitat.title)"
+  }
+
+  /// Another scene: remembered, then every screen is rebuilt around it.
+  @objc private func chooseScene(_ sender: NSMenuItem) {
+    guard habitats.indices.contains(sender.tag), habitats[sender.tag].id != currentHabitat.id else { return }
+    UserDefaults.standard.set(habitats[sender.tag].id, forKey: "scene")
+    brandMenuBar()
+    build()
   }
 
   /// Says what the wallpaper is doing, and why, whenever the menu is opened. Most of the
@@ -541,6 +623,11 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Food that nothing is going to draw would sit in still water until the tank started
     // again and then all arrive at once, so Feed says so rather than promising a feeding.
     feed.isEnabled = applied > 0
+    if let scenes = sceneMenu.submenu {
+      for item in scenes.items {
+        item.state = habitats.indices.contains(item.tag) && habitats[item.tag].id == currentHabitat.id ? .on : .off
+      }
+    }
   }
 
   /// Every screen, because each one runs its own tank with its own fish rather than one

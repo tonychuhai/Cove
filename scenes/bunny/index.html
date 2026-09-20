@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#c9d8ee" />
+    <meta name="description" content="一只会追扫帚的垂耳兔，住在你的桌面上。挥动鼠标，它就追着咬。" />
+    <title>兔兔 • Desktop Habitats</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "../../vendor/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="habitat" aria-label="一只垂耳兔和一把扫帚">
+      <canvas id="scene" aria-label="阳光房间里的垂耳兔。鼠标是一把扫帚，挥一挥它就追着咬。" tabindex="0"></canvas>
+      <div id="overlay">
+        <header class="brand">
+          <h1>Good<br />Things<br />Happen<span aria-hidden="true">♡</span></h1>
+          <p>A happier<br />desktop<br />everyday</p>
+        </header>
+        <div class="bubble" id="bubble" hidden></div>
+        <section class="pet" aria-label="兔兔的状态">
+          <header>
+            <span class="pet-mark" aria-hidden="true">🐰</span>
+            <div>
+              <h2 id="pet-name">兔兔</h2>
+              <p id="pet-sub">垂耳 · 爱追扫帚</p>
+            </div>
+          </header>
+          <div class="stat">
+            <span class="stat-icon" aria-hidden="true">💗</span>
+            <div class="stat-body">
+              <div class="stat-row"><span>亲密度</span><b id="level">Lv.1</b><em id="intimacy">0/100</em></div>
+              <div class="bar"><i id="intimacy-bar" style="width: 0%"></i></div>
+            </div>
+          </div>
+          <div class="stat">
+            <span class="stat-icon" id="mood-face" aria-hidden="true">😊</span>
+            <div class="stat-body">
+              <div class="stat-row"><span>心情</span><b id="mood-label">开心</b><em id="mood">70/100</em></div>
+              <div class="bar mood"><i id="mood-bar" style="width: 70%"></i></div>
+            </div>
+          </div>
+          <p class="pet-quote" id="daily"></p>
+        </section>
+        <nav class="actions" id="actions" aria-label="和兔兔互动">
+          <button type="button" data-action="feed"><span class="icon" aria-hidden="true">🥕</span><b>喂食</b><small>胡萝卜</small></button>
+          <button type="button" data-action="pet"><span class="icon" aria-hidden="true">🤲</span><b>抚摸</b><small>顺着毛摸</small></button>
+          <button type="button" data-action="play"><span class="icon" aria-hidden="true">🧹</span><b>逗它</b><small>扫帚来了</small></button>
+          <button type="button" data-action="rest"><span class="icon" aria-hidden="true">☀️</span><b>休息</b><small>晒太阳睡</small></button>
+        </nav>
+        <p class="hint" id="hint">鼠标就是扫帚：挥一挥，它追着咬；停下来慢慢摸它，是抚摸。</p>
+      </div>
+      <div id="loading" aria-hidden="true"></div>
+    </main>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
