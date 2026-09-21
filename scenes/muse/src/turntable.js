@@ -13,19 +13,25 @@ export function savedLook(raw) {
 }
 
 export function sampleTurn(angle, turning = true) {
-  const normalized = ((angle % 8) + 8) % 8;
-  const frameA = Math.floor(normalized);
-  const x = Math.max(0, Math.min(1, (angle - 3.45) / 1.1));
-  return { frameA, frameB: (frameA + 1) % 8,
-    poseMix: normalized - frameA,
-    outfitMix: turning ? x * x * (3 - 2 * x) : 0 };
+  const position = turning && Number.isFinite(angle) ? Math.max(0, Math.min(5, angle)) : 0;
+  const frameA = Math.min(4, Math.floor(position));
+  const frameB = Math.min(4, frameA + 1);
+  const reveal = position >= 4;
+  const x = Math.max(0, position - 4);
+  return { frameA, frameB,
+    nextFrameA: reveal ? 0 : frameA,
+    nextFrameB: reveal ? 0 : frameB,
+    poseMix: reveal ? 0 : position - frameA,
+    outfitMix: x * x * (3 - 2 * x),
+    phase: !turning ? 'idle' : reveal ? 'reveal' : 'right-turn' };
 }
 
-// Outfit switches while her back faces the camera, halfway through one full turn.
+// Turn right from front to back, then reveal the next outfit directly from the front.
+// Atlas poses 5–7 (the left half of a full turn) are intentionally never sampled.
 // Requests during a turn are ignored, so clicks cannot create an animation backlog.
 export function createTurntable(initial = 1) {
   let current = savedLook({ look: initial }), next = current, progress = 0, turning = false;
-  const duration = 1.05;
+  const duration = 0.82;
   return {
     request(target = (current + 1) % LOOKS.length, reduced = false) {
       if (turning || !Number.isInteger(target) || target < 0 || target >= LOOKS.length || target === current) return false;
@@ -43,10 +49,11 @@ export function createTurntable(initial = 1) {
     get state() {
       const p = turning ? progress : 0;
       const eased = p * p * (3 - 2 * p);
-      return { current, next, turning, progress: p, angle: eased * 8,
-        ...sampleTurn(eased * 8, turning),
-        visible: turning && eased >= 0.5 ? next : current,
-        backgroundMix: turning ? Math.max(0, Math.min(1, (p - 0.28) / 0.44)) : 0 };
+      const pose = sampleTurn(eased * 5, turning);
+      const background = Math.max(0, Math.min(1, (p - 0.4) / 0.6));
+      return { current, next, turning, progress: p, angle: eased * 5, ...pose,
+        visible: turning && pose.outfitMix >= 0.5 ? next : current,
+        backgroundMix: turning ? background * background * (3 - 2 * background) : 0 };
     },
   };
 }

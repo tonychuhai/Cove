@@ -18,9 +18,9 @@ uniform sampler2D nextAtlas;
 uniform sampler2D profiles;
 uniform ivec2 looks;
 uniform ivec2 frames;
+uniform ivec2 nextFrames;
 uniform float poseMix;
 uniform float outfitMix;
-uniform vec2 atlasSize;
 in vec2 uv;
 out vec4 color;
 vec3 profile(int look, int frame, float y) {
@@ -35,9 +35,9 @@ vec4 samplePose(sampler2D atlas, int frame, vec3 shape, vec2 target) {
   float x = mix(shape.x, shape.y, (uv.x - target.x) / max(0.02, target.y - target.x));
   if (x < 0.0 || x > 1.0) return vec4(0.0);
   vec2 tile = vec2(float(frame % 4), float(frame / 4));
-  vec2 p = (tile + vec2(x, shape.z)) / vec2(4.0, 2.0);
-  vec2 edge = 0.5 / atlasSize;
-  p = clamp(p, tile / vec2(4.0, 2.0) + edge, (tile + 1.0) / vec2(4.0, 2.0) - edge);
+  vec2 p = vec2((tile.x + x) / 4.0, shape.z);
+  vec2 edge = 0.5 / vec2(textureSize(atlas, 0));
+  p = clamp(p, vec2(tile.x / 4.0, 0.0) + edge, vec2((tile.x + 1.0) / 4.0, 1.0) - edge);
   return texture(atlas, p);
 }
 void main() {
@@ -45,11 +45,11 @@ void main() {
   if (y < 0.0 || y > 1.0) { color = vec4(0.0); return; }
   vec3 a = profile(looks.x, frames.x, y);
   vec3 b = profile(looks.x, frames.y, y);
-  vec3 c = profile(looks.y, frames.x, y);
-  vec3 d = profile(looks.y, frames.y, y);
+  vec3 c = profile(looks.y, nextFrames.x, y);
+  vec3 d = profile(looks.y, nextFrames.y, y);
   vec2 target = mix(mix(a.xy, b.xy, poseMix), mix(c.xy, d.xy, poseMix), outfitMix);
   vec4 first = mix(samplePose(currentAtlas, frames.x, a, target), samplePose(currentAtlas, frames.y, b, target), poseMix);
-  vec4 second = mix(samplePose(nextAtlas, frames.x, c, target), samplePose(nextAtlas, frames.y, d, target), poseMix);
+  vec4 second = mix(samplePose(nextAtlas, nextFrames.x, c, target), samplePose(nextAtlas, nextFrames.y, d, target), poseMix);
   // Textures are premultiplied: linear mixing preserves body opacity. Drawing two
   // semi-transparent sprites over one another instead made the person fade out.
   color = mix(first, second, outfitMix);
@@ -63,9 +63,27 @@ function silhouetteProfiles(images) {
     scratch.width = image.width; scratch.height = image.height;
     context.drawImage(image, 0, 0);
     const { data } = context.getImageData(0, 0, image.width, image.height);
-    const cellWidth = image.width / 4, w = Math.floor(cellWidth), h = image.height / 2;
+    // Generated sheets can leave unequal top/bottom margins. Locate their empty
+    // inter-row gap instead of cutting shoes off at an assumed 50% divider.
+    const low = Math.floor(image.height * 0.43), high = Math.ceil(image.height * 0.57);
+    const occupancy = [];
+    let minimum = image.width;
+    for (let y = low; y < high; y++) {
+      let count = 0;
+      for (let x = 0; x < image.width; x++) if (data[(y * image.width + x) * 4 + 3] > 128) count++;
+      occupancy.push(count); minimum = Math.min(minimum, count);
+    }
+    let start = 0, bestStart = 0, bestLength = 0;
+    for (let row = 0; row <= occupancy.length; row++) {
+      if (row < occupancy.length && occupancy[row] <= minimum + 2) continue;
+      if (row - start > bestLength) { bestStart = start; bestLength = row - start; }
+      start = row + 1;
+    }
+    const split = bestLength > 0 ? low + bestStart + Math.floor(bestLength / 2) : Math.floor(image.height / 2);
+    const cellWidth = image.width / 4, w = Math.floor(cellWidth);
     for (let frame = 0; frame < 8; frame++) {
-      const rows = [], ox = Math.round((frame % 4) * cellWidth), oy = Math.floor(frame / 4) * h;
+      const rows = [], ox = Math.round((frame % 4) * cellWidth), oy = frame < 4 ? 0 : split;
+      const h = frame < 4 ? split : image.height - split;
       let top = h, bottom = 0;
       for (let y = 0; y < h; y++) {
         const occupied = [];
@@ -87,7 +105,7 @@ function silhouetteProfiles(images) {
           if (bounds) { left += bounds[0]; right += bounds[1]; count++; }
         }
         const index = ((look * 8 + frame) * PROFILE_ROWS + row) * 4;
-        values.set([count ? left / count : 0.45, count ? right / count : 0.55, (y + 0.5) / h, 1], index);
+        values.set([count ? left / count : 0.45, count ? right / count : 0.55, (oy + y + 0.5) / image.height, 1], index);
       }
     }
   });
@@ -124,9 +142,8 @@ export function createPortraitRenderer(canvas, images) {
   const profiles = texture(gl.NEAREST);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, PROFILE_ROWS, images.length * 8, 0, gl.RGBA, gl.FLOAT, silhouetteProfiles(images));
-  const uniforms = Object.fromEntries(['bounds', 'viewport', 'looks', 'frames', 'poseMix', 'outfitMix', 'atlasSize', 'currentAtlas', 'nextAtlas', 'profiles'].map(n => [n, gl.getUniformLocation(program, n)]));
+  const uniforms = Object.fromEntries(['bounds', 'viewport', 'looks', 'frames', 'nextFrames', 'poseMix', 'outfitMix', 'currentAtlas', 'nextAtlas', 'profiles'].map(n => [n, gl.getUniformLocation(program, n)]));
   gl.uniform1i(uniforms.currentAtlas, 0); gl.uniform1i(uniforms.nextAtlas, 1); gl.uniform1i(uniforms.profiles, 2);
-  gl.uniform2f(uniforms.atlasSize, images[0].width, images[0].height);
   gl.clearColor(0, 0, 0, 0);
   return {
     draw(state, bounds, width, height) {
@@ -136,6 +153,7 @@ export function createPortraitRenderer(canvas, images) {
       gl.uniform4f(uniforms.bounds, bounds.x, bounds.y, bounds.w, bounds.h);
       gl.uniform2f(uniforms.viewport, width, height); gl.uniform2i(uniforms.looks, state.current, state.next);
       gl.uniform2i(uniforms.frames, state.frameA, state.frameB);
+      gl.uniform2i(uniforms.nextFrames, state.nextFrameA, state.nextFrameB);
       gl.uniform1f(uniforms.poseMix, state.poseMix); gl.uniform1f(uniforms.outfitMix, state.outfitMix);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     },

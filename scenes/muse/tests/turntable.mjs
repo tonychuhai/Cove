@@ -15,7 +15,13 @@ for (let turn = 0; turn < LOOKS.length; turn++) {
     const s = model.state;
     if (s.turning) {
       assert(s.angle >= previousAngle, 'rotation must move consistently around the body');
-      assert.equal(s.visible, s.angle >= 4 ? to : from, 'outfit only changes while back-facing');
+      assert.equal(s.visible, s.outfitMix >= 0.5 ? to : from, 'label follows the front-facing outfit reveal');
+      assert([s.frameA, s.frameB, s.nextFrameA, s.nextFrameB].every(frame => frame <= 4), 'never render the left-side views');
+      if (s.outfitMix > 0) {
+        assert.equal(s.frameA, 4, 'only reveal a new outfit after reaching the back');
+        assert.equal(s.nextFrameA, 0, 'the new outfit appears directly facing front');
+        assert.equal(s.nextFrameB, 0);
+      }
       if (s.angle >= 4 && s.angle < 5) seenBack = true;
       previousAngle = s.angle;
     }
@@ -41,10 +47,10 @@ for (const [width, height] of [[1440, 900], [390, 844], [1920, 1080]]) {
   assert(figureHit(b.x + b.w / 2, b.y + b.h / 2, b));
   assert(!figureHit(0, 0, b), 'background clicks cannot change the outfit');
 }
-// Sample the whole turn at display cadence, including both sides of all pose seams.
-// There must be no early interval of a key pose where the portrait stops changing.
+// Interpolate continuously along the right half-turn, then crossfade the outgoing
+// back with the incoming front. There are no left-side or rewind poses.
 let previousPosition = -1;
-for (let step = 0; step < 480; step++) {
+for (let step = 0; step < 240; step++) {
   const angle = step / 60;
   const sample = sampleTurn(angle);
   const reconstructed = sample.frameA + sample.poseMix;
@@ -53,13 +59,18 @@ for (let step = 0; step < 480; step++) {
   assert(sample.outfitMix >= 0 && sample.outfitMix <= 1);
   previousPosition = reconstructed;
 }
-for (let seam = 1; seam <= 8; seam++) {
+for (let seam = 1; seam < 4; seam++) {
   const before = sampleTurn(seam - 1e-6), after = sampleTurn(seam + 1e-6);
   assert.equal(before.frameB, after.frameA, 'neighboring pose blends share their boundary photograph');
   assert(before.poseMix > 0.999 && after.poseMix < 0.001);
 }
 assert(sampleTurn(0.25).poseMix > 0, 'the first 70% of a pose must no longer be held still');
 assert.equal(sampleTurn(3).outfitMix, 0);
-assert(Math.abs(sampleTurn(4).outfitMix - 0.5) < 1e-12);
+assert.equal(sampleTurn(4).outfitMix, 0);
+assert.equal(sampleTurn(4.5).outfitMix, 0.5);
 assert.equal(sampleTurn(5).outfitMix, 1);
-console.log('Muse: four-look cycle, back-facing switch, rapid clicks, reduced motion, pause and hit areas passed.');
+assert.equal(sampleTurn(4.5).frameA, 4);
+assert.equal(sampleTurn(4.5).nextFrameA, 0);
+assert.equal(sampleTurn(5).nextFrameA, 0, 'transition ends at the same front view used by idle');
+assert.equal(sampleTurn(5, false).frameA, 0);
+console.log('Muse: right half-turn, direct front reveal, no left views, four-look cycle, rapid clicks, reduced motion, pause and hit areas passed.');

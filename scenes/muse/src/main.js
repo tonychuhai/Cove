@@ -142,11 +142,13 @@ reduced.addEventListener('change', () => { /* The next requested turn honors the
 resize(); syncUI();
 try {
   assets = await Promise.all(LOOKS.map(async (look) => ({
-    person: await loadImage(`assets/${look.id}.png`),
+    person: await loadImage(`assets/${look.id}-face-v2.png`),
     city: look.id === 'casual' ? null : await loadImage(`assets/${look.id}-city.png`),
   })));
   renderer = createPortraitRenderer(canvas, assets.map(asset => asset.person));
   canvas.dataset.renderer = 'webgl2-silhouette-interpolation';
+  canvas.dataset.model = 'face-v2';
+  canvas.dataset.sequence = 'front-right-back-front';
   ready = true; $('loading').hidden = true; updateLoop();
 } catch (error) {
   console.error(error);
