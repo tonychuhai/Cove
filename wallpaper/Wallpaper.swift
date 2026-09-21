@@ -28,6 +28,7 @@ let habitats = [
   Habitat(id: "riverscape", title: "Riverscape", symbol: "fish"),
   Habitat(id: "bunny", title: "Bunny", symbol: "hare"),
   Habitat(id: "muse", title: "Muse · 互动换装", symbol: "tshirt"),
+  Habitat(id: "critters", title: "Critters · 纸上小伙伴", symbol: "pawprint"),
 ]
 var currentHabitat: Habitat {
   let id = UserDefaults.standard.string(forKey: "scene") ?? habitats[0].id
@@ -122,6 +123,17 @@ final class Reporter: NSObject, WKScriptMessageHandler {
   }
 }
 
+/// The left-rail buttons ask the host to rebuild around another scene.
+final class ScenePicker: NSObject, WKScriptMessageHandler {
+  static let shared = ScenePicker()
+  func userContentController(
+    _ controller: WKUserContentController, didReceive message: WKScriptMessage
+  ) {
+    guard let id = message.body as? String else { return }
+    Controller.shared?.applyScene(id)
+  }
+}
+
 /// A window that keeps the exact frame it is given. AppKit insets ordinary windows from
 /// the screen edges; a wallpaper has to reach them.
 final class DesktopWindow: NSWindow {
@@ -186,6 +198,7 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
     view = WKWebView(frame: screen.frame, configuration: settings)
     settings.userContentController.add(Reporter.shared, name: "report")
     settings.userContentController.add(StateStore.shared, name: "state")
+    settings.userContentController.add(ScenePicker.shared, name: "scene")
     // WebKit stops a page whose window it thinks is covered, and AppKit never reports a
     // background agent's window as visible, so the scene would never start. This asks
     // WebKit not to make that call; the agent works out what is covered instead.
@@ -194,8 +207,15 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
     {
       view.setValue(false, forKey: "windowOcclusionDetectionEnabled")
     }
-    view.underPageBackgroundColor = NSColor(
-      calibratedRed: 0.031, green: 0.055, blue: 0.047, alpha: 1)
+    if currentHabitat.id == "critters" {
+      view.underPageBackgroundColor = NSColor(calibratedRed: 0.91, green: 0.89, blue: 0.84, alpha: 1)
+    } else if currentHabitat.id == "muse" {
+      view.underPageBackgroundColor = NSColor(calibratedRed: 0.92, green: 0.91, blue: 0.89, alpha: 1)
+    } else if currentHabitat.id == "bunny" {
+      view.underPageBackgroundColor = NSColor(calibratedRed: 0.79, green: 0.85, blue: 0.93, alpha: 1)
+    } else {
+      view.underPageBackgroundColor = NSColor(calibratedRed: 0.031, green: 0.055, blue: 0.047, alpha: 1)
+    }
     view.autoresizingMask = [.width, .height]
 
     window = DesktopWindow(
@@ -618,11 +638,16 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   /// Another scene: remembered, then every screen is rebuilt around it.
-  @objc private func chooseScene(_ sender: NSMenuItem) {
-    guard habitats.indices.contains(sender.tag), habitats[sender.tag].id != currentHabitat.id else { return }
-    UserDefaults.standard.set(habitats[sender.tag].id, forKey: "scene")
+  func applyScene(_ id: String) {
+    guard habitats.contains(where: { $0.id == id }), id != currentHabitat.id else { return }
+    UserDefaults.standard.set(id, forKey: "scene")
     brandMenuBar()
     build()
+  }
+
+  @objc private func chooseScene(_ sender: NSMenuItem) {
+    guard habitats.indices.contains(sender.tag) else { return }
+    applyScene(habitats[sender.tag].id)
   }
 
   /// Says what the wallpaper is doing, and why, whenever the menu is opened. Most of the
@@ -646,7 +671,10 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Food that nothing is going to draw would sit in still water until the tank started
     // again and then all arrive at once, so Feed says so rather than promising a feeding.
     feed.isEnabled = applied > 0
-    feed.title = currentHabitat.id == "muse" ? "Change outfit · 转身换装" : "Feed"
+    feed.title =
+      currentHabitat.id == "muse"
+      ? "Change outfit · 转身换装"
+      : currentHabitat.id == "critters" ? "New friends · 换一批" : "Feed"
     if let scenes = sceneMenu.submenu {
       for item in scenes.items {
         item.state = habitats.indices.contains(item.tag) && habitats[item.tag].id == currentHabitat.id ? .on : .off
@@ -674,7 +702,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   /// The cursor belongs to the Finder, so its position is read rather than captured.
   private func trackPointer() {
     let point = NSEvent.mouseLocation
-    if currentHabitat.id == "muse" { trackDesktopTap(at: point) }
+    trackDesktopTap(at: point)
     guard abs(point.x - lastPoint.x) > 0.2 || abs(point.y - lastPoint.y) > 0.2 else { return }
     lastPoint = point
     for (index, screen) in NSScreen.screens.enumerated() where index < screens.count {

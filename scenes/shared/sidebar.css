@@ -1,0 +1,51 @@
+#scene-switch {
+  position: fixed;
+  left: 14px;
+  top: 28%;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 7px;
+  border-radius: 22px;
+  background: rgba(22, 20, 18, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+#scene-switch button {
+  appearance: none;
+  width: 58px;
+  padding: 8px 4px 7px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: #f6f1ea;
+  cursor: pointer;
+  font: 600 10px/1.2 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+#scene-switch button span {
+  display: block;
+  font-size: 20px;
+  line-height: 1;
+  margin-bottom: 5px;
+}
+#scene-switch button:hover,
+#scene-switch button:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+}
+#scene-switch button[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.22);
+}
+#scene-switch button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+@media (max-height: 700px) {
+  #scene-switch { top: 18%; padding: 6px 5px; }
+  #scene-switch button { width: 52px; padding: 6px 2px; }
+}

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN" data-motion="host">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#e9e3d7" />
+    <title>纸上小伙伴 • Cove wallpaper</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../shared/sidebar.css" />
+  </head>
+  <body>
+    <main id="habitat" aria-label="一群由代码绘制的小动物">
+      <div class="paper" aria-hidden="true"></div>
+      <canvas id="scene" tabindex="-1"></canvas>
+      <header class="topbar">
+        <div class="brand">
+          <svg class="paw" viewBox="0 0 64 64" aria-hidden="true">
+            <g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round">
+              <ellipse cx="32" cy="41" rx="13" ry="10.5"/>
+              <ellipse cx="14.5" cy="27" rx="5.5" ry="6.5" transform="rotate(-18 14.5 27)"/>
+              <ellipse cx="25" cy="16.5" rx="5.5" ry="6.5" transform="rotate(-6 25 16.5)"/>
+              <ellipse cx="39" cy="16.5" rx="5.5" ry="6.5" transform="rotate(6 39 16.5)"/>
+              <ellipse cx="49.5" cy="27" rx="5.5" ry="6.5" transform="rotate(18 49.5 27)"/>
+            </g>
+          </svg>
+          <div>
+            <h1>纸上小伙伴</h1>
+            <p class="tagline">a rather sociable sketchbook · 每一根线条都是代码</p>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="meta-line">FIELD NOTES / <span id="batchNo">001</span></div>
+          <div class="meta-line strong"><span id="countLabel">18</span> 位小伙伴 · <span id="speciesLabel">12</span> 个物种</div>
+        </div>
+      </header>
+      <footer class="bottombar">
+        <p class="caption" id="caption">鼠标靠近，附近的小家伙会盯着你看。菜单栏换一批新朋友。</p>
+        <p class="colophon"><span id="speciesTotal">15</span> SPECIES · EVERY LITTLE LINE IS CODE</p>
+      </footer>
+    </main>
+    <script type="module" src="src/main.js"></script>
+    <script type="module" src="../shared/sidebar.js"></script>
+  </body>
+</html>
