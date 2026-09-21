@@ -1,0 +1,169 @@
+# Cove
+
+![Riverscape running as a live macOS wallpaper, behind desktop icons and widgets](images/riverscape-desktop.png)
+
+Living scenes for your Mac desktop: an aquarium whose fish you can feed and fish for, and a lop rabbit that chases the broom your cursor has become.
+
+Cove is built on [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats) by Chase Lean. The Riverscape aquarium, its water, plants and fish, and the macOS wallpaper app are his work, used under the MIT license; the fishing line, the medaka, the Bunny scene and the scene menu were added here.
+
+Have you always wanted an aquarium? Now you can have it, right on your desktop :)
+
+The fish react to your cursor and compete for food, while the plants sway in a slow current. There are two scenes: **Riverscape**, a planted freshwater aquarium, and **Bunny**, a lop rabbit in a sunny room whose cursor is a broom — wave it and the rabbit chases and bites it. Switch between them from the menu bar.
+
+The scenes are rendered live with Three.js and WebGL2. Everything runs locally, with no account or internet connection needed after setup. Desktop wallpaper support is **macOS only** for now; you can also try either scene in a browser.
+
+## Install on Mac
+
+You need macOS 13 or newer and the Xcode command line tools. To install the tools, open Terminal and run:
+
+```sh
+xcode-select --install
+```
+
+Wait for that installation to finish. Download and unzip this repository, or clone it, then open Terminal in the project folder and run:
+
+```sh
+sh wallpaper/install.sh
+```
+
+The script builds the app for your Mac, installs it at `~/Applications/Cove.app`, and starts it. It also adds a login item so the aquarium starts when you sign in. Allow about 20 seconds for the first frame to appear.
+
+During installation, macOS may ask whether Terminal can control System Events. This lets the installer set a still image of the aquarium as your desktop picture, underneath the animation. You can decline; the live wallpaper will still work.
+
+You don't need Node.js for the wallpaper. If you already have it, `npm run wallpaper` runs the same installer.
+
+## Use the wallpaper
+
+Click the fish (or hare) icon in the menu bar:
+
+- **Feed** drops ten pellets into each screen's tank, or puts a carrot down for the rabbit. Uneaten pellets dissolve after 20–40 seconds of running simulation time, measured from when they touch the water.
+- **Pause / Resume** controls the animation. Your choice is remembered across restarts.
+- **Scene** switches between Riverscape and Bunny. The choice is remembered.
+- **Quit** closes the app until you open it again or next sign in.
+
+### Bunny
+
+The cursor is a small broom. Wave it about and the rabbit's interest rises until it gives chase: it hops after the broom, leaps for the head, bites, hangs on and shakes it, then lets go and comes back for more. Three bites in a row and it is pleased with itself for a moment. A still broom nearby gets sniffed at; a slow stroke across the rabbit is petting (hearts); left alone it grooms, wanders and eventually flops down to sleep in the sun. The panel shows closeness and mood, which grow with feeding, petting and play and are remembered between runs.
+
+Move your cursor near the fish to see them react. Desktop icons, clicks and dragging work as usual. To feed the fish, use the menu; clicking the desktop does not drop food.
+
+The cursor is also a fishing line: a baited hook hangs wherever the pointer is. Hold it still near the fish and one will take the bait. A hooked fish runs and thrashes for a few seconds; lift it to the top of the screen and hold it there to land it, and it is let go back into the water. Jerk the cursor and the fish tears free. A bare hook is rebaited by lifting it out of the water for a moment (or, left in the water, on its own after a while). The system cursor itself stays as it is; the hook is drawn in the scene under it.
+
+## FAQ
+
+### Does it work on Windows or Linux?
+
+The desktop app supports macOS only. The browser preview needs a browser with WebGL2, but there is no wallpaper installer for Windows or Linux.
+
+### Will it drain my battery?
+
+It uses more power than a still wallpaper because it renders a 3D scene. The amount depends on your Mac, screen resolution and number of displays. There isn't a measured battery-life estimate yet.
+
+The optimized build thins the rear rivergrass by about 30%, reduces oversampling and shadow work, and fully stops the render loop when paused or hidden. It keeps 4× multisampling, the HDR lighting, all 24 fish and the foreground planting. On an M5 Pro this halves the GPU time per frame; battery drain has not been measured.
+
+The wallpaper keeps the same frame-rate limits, so rendering improvements are not spent on extra frames:
+
+| Desktop state | Rendering |
+| --- | --- |
+| Clearly visible, plugged in | Up to 60 fps |
+| Clearly visible, on battery | Up to 30 fps |
+| Mostly covered by windows | Up to 20 fps |
+| Almost entirely covered | Stopped |
+| Low Power Mode, locked screen or sleeping display | Stopped |
+
+Pause it from the menu when you want a still aquarium, or quit to close the app completely. These power controls belong to the wallpaper app; the browser preview does not have the same battery-aware limits.
+
+### Does it monitor my keystrokes?
+
+No. The wallpaper does not listen to typing in other apps or record keystrokes. The browser preview handles Space and F only while that page has focus, for pause and fullscreen.
+
+The wallpaper reads your cursor position so the fish can react. It also checks window positions and sizes to estimate how much of the desktop is visible. It does not capture the contents of those windows, store cursor history, or send this information anywhere.
+
+### Does it need internet access or special permissions?
+
+Once installed, the aquarium works offline. Its code, textures and Three.js library are bundled with the app. There are no analytics or external services.
+
+The app does not request Accessibility, Input Monitoring or Screen Recording access. The optional System Events prompt during installation is for changing the still desktop picture.
+
+### Why have the fish stopped moving?
+
+Open the fish menu to see the current status. The wallpaper stops when it is almost entirely covered, in Low Power Mode, and while the screen is locked or asleep.
+
+If Reduce Motion is enabled in macOS, the aquarium starts paused unless you have already saved a different choice. Choose **Resume** to animate it. Low Power Mode must be turned off before animation can resume.
+
+### Can I use multiple monitors?
+
+Yes. Each display gets its own aquarium, and **Feed** drops food on every display. Each tank renders separately, so more displays can increase power use.
+
+### Do I need to leave Terminal open?
+
+No. The installed app has its own copy of the scene and runs independently. You can close Terminal once installation finishes.
+
+### How do I update it?
+
+Download or pull the latest source, then rerun `sh wallpaper/install.sh` from the project folder. Editing the source alone does not update the installed app. If you installed the earlier Desktop Habitats or Aquatica version, the installer removes its app and login item before starting Cove, and carries Desktop Habitats' settings (scene, pause, the rabbit's memory) over. Old still images are left behind.
+
+### How do I remove it and get my old wallpaper back?
+
+From the project folder, run:
+
+```sh
+sh wallpaper/uninstall.sh
+```
+
+Or use `npm run unwallpaper`. This stops the app, removes its login item and deletes the installed app.
+
+The still image at `~/Pictures/Cove.png` stays behind, along with the desktop picture setting. Choose your previous wallpaper in System Settings, then delete the image if you no longer want it. The saved pause preference is also retained.
+
+## Try it in a browser
+
+With Node.js 20 or newer, run this from the project folder:
+
+```sh
+npm start
+```
+
+Open [the local preview](http://127.0.0.1:8080) for Riverscape, or `/scenes/bunny/` for the rabbit. There is no `npm install` step; the library is included. Use `PORT=8081 npm start` if port 8080 is busy, and Ctrl+C to stop the server.
+
+- Click the water to drop food, and to rebait a bare hook.
+- Move the pointer near the fish to interact. The pointer is the hook and line; the browser's own cursor is hidden while the scene is running.
+- Press **Space** to pause or resume, and **F** for fullscreen.
+
+Reduce Motion starts the preview paused. Serve the page over HTTP; opening `index.html` directly will not load its JavaScript modules. Any static server also works, such as `python3 -m http.server 8080 --bind 127.0.0.1` if you have Python installed.
+
+## Development
+
+One water model drives the plants, drifting particles, fish and underwater lighting. Fish alternate between swimming and coasting, explore the tank, avoid neighbours and compete for pellets. The scene uses raster rendering with custom GLSL shaders, shadows and depth effects.
+
+Riverscape lives in `scenes/riverscape/`, including its textures and tests, and Bunny in `scenes/bunny/` (`scene.js` the room, `rabbit.js` the rabbit and its behaviour, `broom.js` the cursor, `pet-state.js` what it remembers). The Mac app lists the scenes in `wallpaper/Wallpaper.swift` and shows the chosen one; a scene keeps its state through the app's `state` message handler, since the wallpaper's web view stores nothing itself.
+
+| Files | Purpose |
+| --- | --- |
+| `scenes/riverscape/index.html`, `wallpaper.html`, `style.css` | Riverscape's preview and wallpaper layouts |
+| `scenes/riverscape/src/` | Fish, feeding, plants, water, terrain and rendering |
+| `scenes/riverscape/assets/` | Rock, wood and sand textures |
+| `scenes/riverscape/tests/` | Riverscape's headless simulation checks |
+| `wallpaper/` | Mac app and install/uninstall scripts |
+| `vendor/` | Bundled Three.js library and license |
+| `index.html`, `serve.mjs` | Default preview entry and local server |
+
+Run the checks with Node.js:
+
+```sh
+npm run check
+npm test
+```
+
+These check JavaScript syntax; simulate swimming, spacing, startle responses and feeding; verify render budgets and frame pacing at 60/120 Hz; and confirm that rear-grass thinning leaves the foreground geometry and downstream random sequence unchanged. They also check that paused/hidden scenes have no scheduled render callbacks. They do not measure Mac battery use.
+
+The default rendering profile is `balanced`. Append `?quality=reference&still=1` to a scene page for the original density/render budgets at simulation time zero, or `?still=1` for the optimized still. Append `diagnostics=1` to enable the local `habitatBenchmark()` function. Nothing is uploaded.
+
+Browser errors appear in the developer console. Wallpaper errors and frame-rate changes go to `/tmp/cove.log`. Sending `SIGUSR1` to the Cove process saves a snapshot of its first screen to `/tmp/cove.png`.
+
+If you change the app's bundle ID, update `com.tonyzhu.cove` in `wallpaper/install.sh`, `wallpaper/uninstall.sh` and `wallpaper/Info.plist` together.
+
+## Credits and license
+
+Cove is [MIT licensed](../LICENSE). It started from [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats), copyright Chase Lean, also MIT; his notice is kept in the LICENSE file alongside ours. Three.js 0.180.0 is bundled under its [MIT license](../vendor/THREE-LICENSE.txt).
+
+The rock, wood and sand textures come from Poly Haven under [CC0](https://polyhaven.com/license): [Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry), [Rough Wood](https://polyhaven.com/a/rough_wood) and [Sand 01](https://polyhaven.com/a/sand_01).

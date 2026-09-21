@@ -1,169 +1,87 @@
 # Cove
 
-![Riverscape running as a live macOS wallpaper, behind desktop icons and widgets](docs/images/riverscape-desktop.png)
+[English](docs/README.en.md)
 
-Living scenes for your Mac desktop: an aquarium whose fish you can feed and fish for, and a lop rabbit that chases the broom your cursor has become.
+![Riverscape 作为 macOS 动态壁纸运行，在桌面图标和小组件后面](docs/images/riverscape-desktop.png)
 
-Cove is built on [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats) by Chase Lean. The Riverscape aquarium, its water, plants and fish, and the macOS wallpaper app are his work, used under the MIT license; the fishing line, the medaka, the Bunny scene and the scene menu were added here.
+Mac 桌面上的活场景。两个场景，菜单栏一键切换：
 
-Have you always wanted an aquarium? Now you can have it, right on your desktop :)
+- **Riverscape 鱼缸** —— 一缸会认鼠标的鱼。鼠标是一根钓线，停在鱼群边上会有鱼咬钩，提到屏幕顶端就能把它拎出来再放回去。
+- **Bunny 兔子** —— 一只住在阳光房间里的垂耳兔。鼠标是一把小扫帚，挥一挥它就追着咬；停下来慢慢摸它，是抚摸。会记住亲密度和心情。
 
-The fish react to your cursor and compete for food, while the plants sway in a slow current. There are two scenes: **Riverscape**, a planted freshwater aquarium, and **Bunny**, a lop rabbit in a sunny room whose cursor is a broom — wave it and the rabbit chases and bites it. Switch between them from the menu bar.
+全部本地渲染（Three.js + WebGL2），不联网、不要账号、不要任何权限。目前只支持 macOS 13 及以上。
 
-The scenes are rendered live with Three.js and WebGL2. Everything runs locally, with no account or internet connection needed after setup. Desktop wallpaper support is **macOS only** for now; you can also try either scene in a browser.
+## 安装
 
-## Install on Mac
+### 用 Codex 一键安装
 
-You need macOS 13 or newer and the Xcode command line tools. To install the tools, open Terminal and run:
+打开 Codex（终端里输入 `codex`；用 Cursor 或 Claude Code 也一样），把下面这段话整段粘贴给它：
 
-```sh
-xcode-select --install
+```text
+帮我安装 Cove 桌面壁纸：
+1. 先检查 Xcode 命令行工具装没装（swiftc --version），没有就运行 xcode-select --install 并等它完成；
+2. 把 https://github.com/tonychuhai/cove.git 克隆到 ~/Documents/code/cove；
+3. 进入该目录运行 sh wallpaper/install.sh；
+4. 装完告诉我菜单栏图标在哪、怎么切换场景。
 ```
 
-Wait for that installation to finish. Download and unzip this repository, or clone it, then open Terminal in the project folder and run:
+它会拉代码、编译、装到 `~/Applications/Cove.app`，并设为登录自启。第一帧大约 20 秒后出现。安装过程中 macOS 可能会问"终端是否可以控制系统事件"，同意即可——只是把一张静态画面设为桌面图片，垫在动画下面；拒绝也不影响。
+
+### 手动安装
 
 ```sh
+xcode-select --install        # 已装过可跳过
+git clone https://github.com/tonychuhai/cove.git && cd cove
 sh wallpaper/install.sh
 ```
 
-The script builds the app for your Mac, installs it at `~/Applications/Cove.app`, and starts it. It also adds a login item so the aquarium starts when you sign in. Allow about 20 seconds for the first frame to appear.
+更新：`git pull` 之后再跑一次 `sh wallpaper/install.sh`。
+卸载：`sh wallpaper/uninstall.sh`，然后在系统设置里换回你原来的壁纸。
 
-During installation, macOS may ask whether Terminal can control System Events. This lets the installer set a still image of the aquarium as your desktop picture, underneath the animation. You can decline; the live wallpaper will still work.
+## 怎么玩
 
-You don't need Node.js for the wallpaper. If you already have it, `npm run wallpaper` runs the same installer.
+点菜单栏的 🐟 / 🐇 图标：
 
-## Use the wallpaper
-
-Click the fish (or hare) icon in the menu bar:
-
-- **Feed** drops ten pellets into each screen's tank, or puts a carrot down for the rabbit. Uneaten pellets dissolve after 20–40 seconds of running simulation time, measured from when they touch the water.
-- **Pause / Resume** controls the animation. Your choice is remembered across restarts.
-- **Scene** switches between Riverscape and Bunny. The choice is remembered.
-- **Quit** closes the app until you open it again or next sign in.
-
-### Bunny
-
-The cursor is a small broom. Wave it about and the rabbit's interest rises until it gives chase: it hops after the broom, leaps for the head, bites, hangs on and shakes it, then lets go and comes back for more. Three bites in a row and it is pleased with itself for a moment. A still broom nearby gets sniffed at; a slow stroke across the rabbit is petting (hearts); left alone it grooms, wanders and eventually flops down to sleep in the sun. The panel shows closeness and mood, which grow with feeding, petting and play and are remembered between runs.
-
-Move your cursor near the fish to see them react. Desktop icons, clicks and dragging work as usual. To feed the fish, use the menu; clicking the desktop does not drop food.
-
-The cursor is also a fishing line: a baited hook hangs wherever the pointer is. Hold it still near the fish and one will take the bait. A hooked fish runs and thrashes for a few seconds; lift it to the top of the screen and hold it there to land it, and it is let go back into the water. Jerk the cursor and the fish tears free. A bare hook is rebaited by lifting it out of the water for a moment (or, left in the water, on its own after a while). The system cursor itself stays as it is; the hook is drawn in the scene under it.
-
-## FAQ
-
-### Does it work on Windows or Linux?
-
-The desktop app supports macOS only. The browser preview needs a browser with WebGL2, but there is no wallpaper installer for Windows or Linux.
-
-### Will it drain my battery?
-
-It uses more power than a still wallpaper because it renders a 3D scene. The amount depends on your Mac, screen resolution and number of displays. There isn't a measured battery-life estimate yet.
-
-The optimized build thins the rear rivergrass by about 30%, reduces oversampling and shadow work, and fully stops the render loop when paused or hidden. It keeps 4× multisampling, the HDR lighting, all 24 fish and the foreground planting. On an M5 Pro this halves the GPU time per frame; battery drain has not been measured.
-
-The wallpaper keeps the same frame-rate limits, so rendering improvements are not spent on extra frames:
-
-| Desktop state | Rendering |
+| 菜单 | 作用 |
 | --- | --- |
-| Clearly visible, plugged in | Up to 60 fps |
-| Clearly visible, on battery | Up to 30 fps |
-| Mostly covered by windows | Up to 20 fps |
-| Almost entirely covered | Stopped |
-| Low Power Mode, locked screen or sleeping display | Stopped |
+| **Feed** | 鱼缸撒一把鱼食；兔子放一根胡萝卜 |
+| **Pause / Resume** | 暂停 / 继续，选择会记住 |
+| **Scene** | 切换 Riverscape / Bunny |
+| **Quit** | 退出，直到下次登录或手动打开 |
 
-Pause it from the menu when you want a still aquarium, or quit to close the app completely. These power controls belong to the wallpaper app; the browser preview does not have the same battery-aware limits.
+**鱼缸**：把钓线停在鱼旁边等它咬钩；上钩后鱼会拽线乱窜，把鼠标提到屏幕最顶端停一秒多就"收鱼"，随后放生；猛甩鼠标鱼会脱钩。空钩提出水面半秒自动换饵。
 
-### Does it monitor my keystrokes?
+**兔子**：挥动鼠标，它先竖耳，再蹦过来对着扫帚头起跳、咬住、甩头；连咬三口会得意地歇一会儿。扫帚不动它就过来闻闻；没人理会洗脸、溜达，四分钟后趴下睡觉，鼠标靠近就醒。
 
-No. The wallpaper does not listen to typing in other apps or record keystrokes. The browser preview handles Space and F only while that page has focus, for pause and fullscreen.
+桌面图标、点击、拖拽一切照常，壁纸不接收鼠标事件，只读取光标位置。
 
-The wallpaper reads your cursor position so the fish can react. It also checks window positions and sizes to estimate how much of the desktop is visible. It does not capture the contents of those windows, store cursor history, or send this information anywhere.
+## 常见问题
 
-### Does it need internet access or special permissions?
+**耗电吗？** 比静态壁纸多一点。壁纸完全露出时最高 60 fps（电池 30），被窗口盖住大半降到 20，几乎全盖住就停，低电量模式、锁屏、合盖时不画。
 
-Once installed, the aquarium works offline. Its code, textures and Three.js library are bundled with the app. There are no analytics or external services.
+**会监听键盘吗？** 不会。只读光标位置和窗口位置（用来判断露出多少），不记录、不上传。
 
-The app does not request Accessibility, Input Monitoring or Screen Recording access. The optional System Events prompt during installation is for changing the still desktop picture.
+**多显示器？** 每块屏一个独立场景，Feed 对所有屏生效。
 
-### Why have the fish stopped moving?
+**画面不动了？** 打开菜单看状态行，多半是被盖住、低电量或开了"减弱动态效果"（此时会以暂停状态启动，点 Resume 即可）。
 
-Open the fish menu to see the current status. The wallpaper stops when it is almost entirely covered, in Low Power Mode, and while the screen is locked or asleep.
+## 浏览器里试试
 
-If Reduce Motion is enabled in macOS, the aquarium starts paused unless you have already saved a different choice. Choose **Resume** to animate it. Low Power Mode must be turned off before animation can resume.
+需要 Node.js 20+，项目目录下运行 `npm start`，打开 http://127.0.0.1:8080 是鱼缸，`/scenes/bunny/` 是兔子。浏览器版可以点击：点水面撒食，兔子那边有喂食 / 抚摸 / 逗它 / 休息按钮。空格暂停，F 全屏。端口被占就 `PORT=8081 npm start`。
 
-### Can I use multiple monitors?
+## 开发
 
-Yes. Each display gets its own aquarium, and **Feed** drops food on every display. Each tank renders separately, so more displays can increase power use.
-
-### Do I need to leave Terminal open?
-
-No. The installed app has its own copy of the scene and runs independently. You can close Terminal once installation finishes.
-
-### How do I update it?
-
-Download or pull the latest source, then rerun `sh wallpaper/install.sh` from the project folder. Editing the source alone does not update the installed app. If you installed the earlier Desktop Habitats or Aquatica version, the installer removes its app and login item before starting Cove, and carries Desktop Habitats' settings (scene, pause, the rabbit's memory) over. Old still images are left behind.
-
-### How do I remove it and get my old wallpaper back?
-
-From the project folder, run:
-
-```sh
-sh wallpaper/uninstall.sh
-```
-
-Or use `npm run unwallpaper`. This stops the app, removes its login item and deletes the installed app.
-
-The still image at `~/Pictures/Cove.png` stays behind, along with the desktop picture setting. Choose your previous wallpaper in System Settings, then delete the image if you no longer want it. The saved pause preference is also retained.
-
-## Try it in a browser
-
-With Node.js 20 or newer, run this from the project folder:
-
-```sh
-npm start
-```
-
-Open [the local preview](http://127.0.0.1:8080) for Riverscape, or `/scenes/bunny/` for the rabbit. There is no `npm install` step; the library is included. Use `PORT=8081 npm start` if port 8080 is busy, and Ctrl+C to stop the server.
-
-- Click the water to drop food, and to rebait a bare hook.
-- Move the pointer near the fish to interact. The pointer is the hook and line; the browser's own cursor is hidden while the scene is running.
-- Press **Space** to pause or resume, and **F** for fullscreen.
-
-Reduce Motion starts the preview paused. Serve the page over HTTP; opening `index.html` directly will not load its JavaScript modules. Any static server also works, such as `python3 -m http.server 8080 --bind 127.0.0.1` if you have Python installed.
-
-## Development
-
-One water model drives the plants, drifting particles, fish and underwater lighting. Fish alternate between swimming and coasting, explore the tank, avoid neighbours and compete for pellets. The scene uses raster rendering with custom GLSL shaders, shadows and depth effects.
-
-Riverscape lives in `scenes/riverscape/`, including its textures and tests, and Bunny in `scenes/bunny/` (`scene.js` the room, `rabbit.js` the rabbit and its behaviour, `broom.js` the cursor, `pet-state.js` what it remembers). The Mac app lists the scenes in `wallpaper/Wallpaper.swift` and shows the chosen one; a scene keeps its state through the app's `state` message handler, since the wallpaper's web view stores nothing itself.
-
-| Files | Purpose |
+| 位置 | 内容 |
 | --- | --- |
-| `scenes/riverscape/index.html`, `wallpaper.html`, `style.css` | Riverscape's preview and wallpaper layouts |
-| `scenes/riverscape/src/` | Fish, feeding, plants, water, terrain and rendering |
-| `scenes/riverscape/assets/` | Rock, wood and sand textures |
-| `scenes/riverscape/tests/` | Riverscape's headless simulation checks |
-| `wallpaper/` | Mac app and install/uninstall scripts |
-| `vendor/` | Bundled Three.js library and license |
-| `index.html`, `serve.mjs` | Default preview entry and local server |
+| `scenes/riverscape/` | 鱼缸：`src/fish*.js` 鱼的解剖与行为，`src/tackle.js` 钓线 |
+| `scenes/bunny/` | 兔子：`src/scene.js` 房间，`src/rabbit.js` 兔子，`src/broom.js` 扫帚，`src/pet-state.js` 记忆 |
+| `wallpaper/` | Mac App（Swift，一个 WebView 放在桌面层）与安装 / 卸载脚本 |
+| `vendor/` | 随包附带的 Three.js |
 
-Run the checks with Node.js:
+`npm run check` 做语法检查，`npm test` 跑鱼群行为、渲染预算、植物几何的无头测试。壁纸日志在 `/tmp/cove.log`，给进程发 `SIGUSR1` 会把第一块屏的画面存到 `/tmp/cove.png`。新场景放在 `scenes/<名字>/`，在 `wallpaper/Wallpaper.swift` 的 `habitats` 列表里登记一行即可出现在 Scene 菜单。
 
-```sh
-npm run check
-npm test
-```
+## 致谢与许可
 
-These check JavaScript syntax; simulate swimming, spacing, startle responses and feeding; verify render budgets and frame pacing at 60/120 Hz; and confirm that rear-grass thinning leaves the foreground geometry and downstream random sequence unchanged. They also check that paused/hidden scenes have no scheduled render callbacks. They do not measure Mac battery use.
+Cove 基于 Chase Lean 的 [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats)：Riverscape 鱼缸的水、植物、鱼，以及 macOS 壁纸 App 都是他的工作，MIT 协议；钓线、青鳉、兔子场景和场景菜单是 Cove 加的。两份版权声明都保留在 [LICENSE](LICENSE) 里，Cove 同样采用 MIT。
 
-The default rendering profile is `balanced`. Append `?quality=reference&still=1` to a scene page for the original density/render budgets at simulation time zero, or `?still=1` for the optimized still. Append `diagnostics=1` to enable the local `habitatBenchmark()` function. Nothing is uploaded.
-
-Browser errors appear in the developer console. Wallpaper errors and frame-rate changes go to `/tmp/cove.log`. Sending `SIGUSR1` to the Cove process saves a snapshot of its first screen to `/tmp/cove.png`.
-
-If you change the app's bundle ID, update `com.tonyzhu.cove` in `wallpaper/install.sh`, `wallpaper/uninstall.sh` and `wallpaper/Info.plist` together.
-
-## Credits and license
-
-Cove is [MIT licensed](LICENSE). It started from [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats), copyright Chase Lean, also MIT; his notice is kept in the LICENSE file alongside ours. Three.js 0.180.0 is bundled under its [MIT license](vendor/THREE-LICENSE.txt).
-
-The rock, wood and sand textures come from Poly Haven under [CC0](https://polyhaven.com/license): [Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry), [Rough Wood](https://polyhaven.com/a/rough_wood) and [Sand 01](https://polyhaven.com/a/sand_01).
+Three.js 0.180.0 以 [MIT](vendor/THREE-LICENSE.txt) 附带。石头、木头、沙子纹理来自 Poly Haven（[CC0](https://polyhaven.com/license)）：[Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry)、[Rough Wood](https://polyhaven.com/a/rough_wood)、[Sand 01](https://polyhaven.com/a/sand_01)。
