@@ -2,7 +2,9 @@
 
 [English](docs/README.en.md)
 
-![Riverscape 作为 macOS 动态壁纸运行，在桌面图标和小组件后面](docs/images/riverscape-desktop.png)
+https://github.com/user-attachments/assets/675e99c0-0e4f-43cf-b887-8cfe9d6ef589
+
+https://github.com/user-attachments/assets/dea84ad3-d054-4328-b521-40fcbdb68cec
 
 Mac 桌面上的活场景。两个场景，菜单栏一键切换：
 

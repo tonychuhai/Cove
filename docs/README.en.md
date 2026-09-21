@@ -1,6 +1,8 @@
 # Cove
 
-![Riverscape running as a live macOS wallpaper, behind desktop icons and widgets](images/riverscape-desktop.png)
+https://github.com/user-attachments/assets/675e99c0-0e4f-43cf-b887-8cfe9d6ef589
+
+https://github.com/user-attachments/assets/dea84ad3-d054-4328-b521-40fcbdb68cec
 
 Living scenes for your Mac desktop: an aquarium whose fish you can feed and fish for, and a lop rabbit that chases the broom your cursor has become.
 
