@@ -130,7 +130,8 @@ final class ScenePicker: NSObject, WKScriptMessageHandler {
     _ controller: WKUserContentController, didReceive message: WKScriptMessage
   ) {
     guard let id = message.body as? String else { return }
-    Controller.shared?.applyScene(id)
+    // Not from inside the web view's own callback: the switch tears that view down.
+    DispatchQueue.main.async { Controller.shared?.applyScene(id) }
   }
 }
 
@@ -150,8 +151,13 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
   private var inside = false
   private var rate = 0
   private var battery = false
+  private var readyHandlers: [() -> Void] = []
+  private var ready = false
+  private var readyPolls = 0
 
-  init(screen: NSScreen, root: URL) {
+  /// Invisible until told otherwise, so a scene that takes seconds to compile can be
+  /// brought up behind the one it replaces and shown only once it has a frame to show.
+  init(screen: NSScreen, root: URL, concealed: Bool = false) {
     let settings = WKWebViewConfiguration()
     settings.setURLSchemeHandler(SceneHandler(root: root), forURLScheme: sceneScheme)
     settings.suppressesIncrementalRendering = true
@@ -235,9 +241,55 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
     // Hiding the agent, or another app's "Hide Others", must not take the water away.
     window.canHide = false
     window.setFrame(screen.frame, display: true)
+    if concealed { window.alphaValue = 0 }
     window.orderFrontRegardless()
 
     view.load(URLRequest(url: URL(string: "\(sceneScheme)://\(sceneHost)\(scenePage)")!))
+  }
+
+  /// Runs once the page has drawn its first frame, or after a generous wait if it never
+  /// says so. Called straight away if that has already happened.
+  func whenReady(_ handler: @escaping () -> Void) {
+    if ready { handler() } else { readyHandlers.append(handler) }
+  }
+
+  /// Fades the window in over the scene beneath it.
+  func reveal() {
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = 0.45
+      window.animator().alphaValue = 1
+    }
+  }
+
+  private func becomeReady() {
+    guard !ready else { return }
+    ready = true
+    let handlers = readyHandlers
+    readyHandlers = []
+    for handler in handlers { handler() }
+  }
+
+  /// The scenes cover themselves with #loading until their first frame; a page without
+  /// one is ready as soon as it has loaded.
+  private func pollReady() {
+    readyPolls += 1
+    view.evaluateJavaScript(
+      """
+      (() => {
+        const loading = document.querySelector('#loading');
+        if (!loading || loading.hidden) return true;
+        const style = getComputedStyle(loading);
+        return style.display === 'none' || style.opacity === '0';
+      })()
+      """
+    ) { [weak self] value, _ in
+      guard let self else { return }
+      if value as? Bool == true || self.readyPolls > 60 {
+        self.becomeReady()
+      } else {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.pollReady() }
+      }
+    }
   }
 
   func close() {
@@ -246,6 +298,7 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
     view.configuration.userContentController.removeAllUserScripts()
     view.configuration.userContentController.removeScriptMessageHandler(forName: "report")
     view.configuration.userContentController.removeScriptMessageHandler(forName: "state")
+    view.configuration.userContentController.removeScriptMessageHandler(forName: "scene")
     view.removeFromSuperview()
     window.contentView = nil
     window.orderOut(nil)
@@ -304,8 +357,11 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
       "habitatPointer(\(String(format: "%.1f", point.x)),\(String(format: "%.1f", point.y)))")
   }
 
+  /// A short tap on bare desktop. Delivered even while the scene holds still behind
+  /// windows, so the left rail can always change scenes; each scene decides for itself
+  /// whether anything else should happen while it is stopped.
   func click(at point: NSPoint) {
-    guard loaded, rate > 0 else { return }
+    guard loaded else { return }
     view.evaluateJavaScript(
       "typeof habitatClick === 'function' && habitatClick(\(String(format: "%.1f", point.x)),\(String(format: "%.1f", point.y)))")
   }
@@ -313,6 +369,7 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
     loaded = true
     send()
+    pollReady()
   }
 
   func webView(
@@ -320,6 +377,7 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
     withError error: Error
   ) {
     NSLog("cove: the scene did not load: \(error.localizedDescription)")
+    becomeReady()
   }
 
   /// What the page thinks it is doing, for the log.
@@ -329,9 +387,10 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
       (() => {
         const canvas = document.querySelector('#scene');
         const context = canvas && canvas.getContext('webgl2');
+        const loading = document.querySelector('#loading');
         return JSON.stringify({
           pixels: canvas && [canvas.width, canvas.height],
-          covered: !document.querySelector('#loading').hidden,
+          covered: Boolean(loading && !loading.hidden),
           webgl2: Boolean(context),
           gpu: context && context.getParameter(context.RENDERER),
           hidden: document.hidden,
@@ -477,9 +536,39 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     desktopPress = nil
     leftWasDown = NSEvent.pressedMouseButtons & 1 != 0
     layout = NSScreen.screens.map(\.frame)
-    for screen in screens { screen.close() }
+    for screen in screens + retiring { screen.close() }
+    retiring = []
     screens = NSScreen.screens.map { Wallpaper(screen: $0, root: root) }
     applyRate()
+  }
+
+  /// A scene change the person is watching. The old scene stays up while the new one
+  /// loads and compiles behind it; when every screen has a first frame the new one fades
+  /// in and the old one goes. Compared with a bare rebuild, nothing goes blank.
+  private var retiring: [Wallpaper] = []
+  private func crossfade() {
+    desktopPress = nil
+    leftWasDown = NSEvent.pressedMouseButtons & 1 != 0
+    layout = NSScreen.screens.map(\.frame)
+    // A switch during a switch: whatever was on its way out goes now.
+    for screen in retiring { screen.close() }
+    retiring = screens
+    screens = NSScreen.screens.map { Wallpaper(screen: $0, root: root, concealed: true) }
+    applyRate()
+    let arriving = screens
+    var waiting = arriving.count
+    for screen in arriving {
+      screen.whenReady { [weak self] in
+        waiting -= 1
+        guard waiting == 0, let self, self.screens.first === arriving.first else { return }
+        for screen in arriving { screen.reveal() }
+        let leaving = self.retiring
+        self.retiring = []
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+          for screen in leaving { screen.close() }
+        }
+      }
+    }
   }
 
   private var onBattery: Bool {
@@ -512,8 +601,10 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private func updateTimers(pollExposure: Bool) {
-    // Pointer sampling need not outrun the animation, nor wake a stopped wallpaper.
-    let wanted = min(30, applied)
+    // Pointer sampling need not outrun the animation. A wallpaper merely resting behind
+    // windows keeps a slow beat, so a tap on the left rail still changes the scene; only
+    // one that is deliberately still (paused, Low Power Mode, dark display) sleeps.
+    let wanted = pollExposure ? max(15, min(30, applied)) : 0
     if wanted != pointerRate {
       desktopPress = nil
       leftWasDown = NSEvent.pressedMouseButtons & 1 != 0
@@ -642,7 +733,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     guard habitats.contains(where: { $0.id == id }), id != currentHabitat.id else { return }
     UserDefaults.standard.set(id, forKey: "scene")
     brandMenuBar()
-    build()
+    crossfade()
   }
 
   @objc private func chooseScene(_ sender: NSMenuItem) {
@@ -713,8 +804,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
   }
 
-  /// Sample only the button state for Muse. No event interception or input permission;
-  /// Finder still receives the original click. A drag or a click over an app is ignored.
+  /// Sample only the button state. No event interception or input permission; Finder
+  /// still receives the original click. A drag or a click over an app is ignored.
   private func trackDesktopTap(at point: NSPoint) {
     let down = NSEvent.pressedMouseButtons & 1 != 0
     defer { leftWasDown = down }

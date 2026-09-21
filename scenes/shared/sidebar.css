@@ -44,6 +44,17 @@
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
+#scene-switch button[aria-busy="true"] {
+  background: rgba(255, 255, 255, 0.18);
+  animation: scene-switch-busy 1.1s ease-in-out infinite;
+}
+@keyframes scene-switch-busy {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #scene-switch button[aria-busy="true"] { animation: none; }
+}
 
 @media (max-height: 700px) {
   #scene-switch { top: 18%; padding: 6px 5px; }

@@ -17,8 +17,11 @@ function wallpaperPage(id) {
     : `/scenes/${id}/`;
 }
 
-function go(id) {
+function go(id, button) {
   if (id === currentScene()) return;
+  // The next scene takes a few seconds to load; say so on the button that asked for it.
+  for (const other of nav.querySelectorAll("[data-scene]")) other.removeAttribute("aria-busy");
+  button.setAttribute("aria-busy", "true");
   if (window.webkit?.messageHandlers?.scene) {
     window.webkit.messageHandlers.scene.postMessage(id);
     return;
@@ -36,7 +39,7 @@ for (const scene of SCENES) {
   button.dataset.scene = scene.id;
   button.innerHTML = `<span aria-hidden="true">${scene.mark}</span>${scene.label}`;
   if (scene.id === here) button.setAttribute("aria-current", "page");
-  button.addEventListener("click", () => go(scene.id));
+  button.addEventListener("click", () => go(scene.id, button));
   nav.append(button);
 }
 document.body.append(nav);
