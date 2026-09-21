@@ -27,6 +27,7 @@ struct Habitat {
 let habitats = [
   Habitat(id: "riverscape", title: "Riverscape", symbol: "fish"),
   Habitat(id: "bunny", title: "Bunny", symbol: "hare"),
+  Habitat(id: "muse", title: "Muse · 互动换装", symbol: "tshirt"),
 ]
 var currentHabitat: Habitat {
   let id = UserDefaults.standard.string(forKey: "scene") ?? habitats[0].id
@@ -283,6 +284,12 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
       "habitatPointer(\(String(format: "%.1f", point.x)),\(String(format: "%.1f", point.y)))")
   }
 
+  func click(at point: NSPoint) {
+    guard loaded, rate > 0 else { return }
+    view.evaluateJavaScript(
+      "typeof habitatClick === 'function' && habitatClick(\(String(format: "%.1f", point.x)),\(String(format: "%.1f", point.y)))")
+  }
+
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
     loaded = true
     send()
@@ -338,6 +345,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var awake = true
   private var layout: [CGRect] = []
   private var lastPoint = NSPoint(x: -1e4, y: -1e4)
+  private var leftWasDown = false
+  private var desktopPress: (point: NSPoint, time: TimeInterval)?
   private var snapshots: DispatchSourceSignal?
   private var status: NSStatusItem?
   private let state = NSMenuItem()
@@ -445,6 +454,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private func build() {
+    desktopPress = nil
+    leftWasDown = NSEvent.pressedMouseButtons & 1 != 0
     layout = NSScreen.screens.map(\.frame)
     for screen in screens { screen.close() }
     screens = NSScreen.screens.map { Wallpaper(screen: $0, root: root) }
@@ -484,6 +495,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Pointer sampling need not outrun the animation, nor wake a stopped wallpaper.
     let wanted = min(30, applied)
     if wanted != pointerRate {
+      desktopPress = nil
+      leftWasDown = NSEvent.pressedMouseButtons & 1 != 0
       pointerTimer?.invalidate()
       pointerTimer = nil
       pointerRate = wanted
@@ -633,6 +646,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Food that nothing is going to draw would sit in still water until the tank started
     // again and then all arrive at once, so Feed says so rather than promising a feeding.
     feed.isEnabled = applied > 0
+    feed.title = currentHabitat.id == "muse" ? "Change outfit · 转身换装" : "Feed"
     if let scenes = sceneMenu.submenu {
       for item in scenes.items {
         item.state = habitats.indices.contains(item.tag) && habitats[item.tag].id == currentHabitat.id ? .on : .off
@@ -660,6 +674,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   /// The cursor belongs to the Finder, so its position is read rather than captured.
   private func trackPointer() {
     let point = NSEvent.mouseLocation
+    if currentHabitat.id == "muse" { trackDesktopTap(at: point) }
     guard abs(point.x - lastPoint.x) > 0.2 || abs(point.y - lastPoint.y) > 0.2 else { return }
     lastPoint = point
     for (index, screen) in NSScreen.screens.enumerated() where index < screens.count {
@@ -668,6 +683,36 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         frame.contains(point)
           ? NSPoint(x: point.x - frame.minX, y: frame.maxY - point.y) : nil)
     }
+  }
+
+  /// Sample only the button state for Muse. No event interception or input permission;
+  /// Finder still receives the original click. A drag or a click over an app is ignored.
+  private func trackDesktopTap(at point: NSPoint) {
+    let down = NSEvent.pressedMouseButtons & 1 != 0
+    defer { leftWasDown = down }
+    if down && !leftWasDown {
+      desktopPress = desktopPointIsExposed(point) ? (point, ProcessInfo.processInfo.systemUptime) : nil
+    }
+    if down, let start = desktopPress, hypot(point.x - start.point.x, point.y - start.point.y) > 8 {
+      desktopPress = nil
+    }
+    guard !down, leftWasDown, let start = desktopPress else { return }
+    desktopPress = nil
+    guard ProcessInfo.processInfo.systemUptime - start.time < 0.65,
+      hypot(point.x - start.point.x, point.y - start.point.y) <= 8,
+      desktopPointIsExposed(point) else { return }
+    for (index, screen) in NSScreen.screens.enumerated() where index < screens.count {
+      if screen.frame.contains(point) {
+        screens[index].click(at: NSPoint(x: point.x - screen.frame.minX, y: screen.frame.maxY - point.y))
+      }
+    }
+  }
+
+  private func desktopPointIsExposed(_ point: NSPoint) -> Bool {
+    guard let screen = NSScreen.screens.first(where: { $0.frame.contains(point) }),
+      screen.visibleFrame.contains(point) else { return false }
+    let flipped = CGPoint(x: point.x, y: (NSScreen.screens.first?.frame.height ?? 0) - point.y)
+    return !windowBlockers().contains(where: { $0.contains(flipped) })
   }
 }
 

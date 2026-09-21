@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#eae9e4"><title>Muse · Cove</title>
+  <link rel="icon" href="data:,"><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="habitat" aria-label="Muse，点击人物转身换装">
+  <div id="backdrop-a" class="backdrop" aria-hidden="true"></div>
+  <div id="backdrop-b" class="backdrop" aria-hidden="true"></div>
+  <div class="ground" aria-hidden="true"></div>
+  <div id="figure-shadow" aria-hidden="true"></div>
+  <canvas id="scene" aria-label="互动人物，点击她转身换装" role="button" tabindex="0"></canvas>
+  <div class="wash" aria-hidden="true"></div>
+  <header class="masthead"><a href="../../" aria-label="Cove 首页">COVE <span>/</span> MUSE</a><span class="edition">A LITTLE CHANGE OF SCENERY</span></header>
+  <button id="pause" class="quiet" aria-label="暂停动画" aria-pressed="false">暂停</button>
+  <section class="destination" aria-live="polite" aria-atomic="true">
+    <p class="eyebrow"><span id="number">02</span><span class="rule"></span><span id="english">SHANGHAI</span></p>
+    <h1 id="city">上海</h1><p id="detail">玉色长裙 · 漫步外滩</p>
+  </section>
+  <nav class="looks" aria-label="选择穿搭">
+    <button data-look="0" style="--swatch:#9faa91" aria-label="日常休闲装" aria-pressed="false"><i></i><span>日常</span></button>
+    <button data-look="1" style="--swatch:#8dada1" aria-label="上海玉色长裙" aria-pressed="true"><i></i><span>上海</span></button>
+    <button data-look="2" style="--swatch:#8b5258" aria-label="伦敦酒红风衣" aria-pressed="false"><i></i><span>伦敦</span></button>
+    <button data-look="3" style="--swatch:#b2a0cd" aria-label="东京淡紫裙装" aria-pressed="false"><i></i><span>东京</span></button>
+  </nav>
+  <footer><span id="hint">点击人物，转身遇见下一站</span><button id="change">转身换装 <span aria-hidden="true">↻</span></button></footer>
+  <div id="loading" role="status">正在准备衣橱<span>四套穿搭，一场小旅行</span></div>
+</main>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -4,13 +4,15 @@ https://github.com/user-attachments/assets/675e99c0-0e4f-43cf-b887-8cfe9d6ef589
 
 https://github.com/user-attachments/assets/dea84ad3-d054-4328-b521-40fcbdb68cec
 
-Living scenes for your Mac desktop: an aquarium whose fish you can feed and fish for, and a lop rabbit that chases the broom your cursor has become.
+![Muse dress-up: Shanghai Bund, cheongsam and long skirt](images/muse.jpg)
 
-Cove is built on [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats) by Chase Lean. The Riverscape aquarium, its water, plants and fish, and the macOS wallpaper app are his work, used under the MIT license; the fishing line, the medaka, the Bunny scene and the scene menu were added here.
+Living scenes for your Mac desktop: an aquarium whose fish you can feed and fish for, a lop rabbit that chases the broom your cursor has become, and Muse, a dress-up companion who turns in place to change outfits.
+
+Cove is built on [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats) by Chase Lean. The Riverscape aquarium, its water, plants and fish, and the macOS wallpaper app are his work, used under the MIT license; the fishing line, the medaka, the Bunny scene, Muse and the scene menu were added here.
 
 Have you always wanted an aquarium? Now you can have it, right on your desktop :)
 
-The fish react to your cursor and compete for food, while the plants sway in a slow current. There are two scenes: **Riverscape**, a planted freshwater aquarium, and **Bunny**, a lop rabbit in a sunny room whose cursor is a broom — wave it and the rabbit chases and bites it. Switch between them from the menu bar.
+The fish react to your cursor and compete for food, while the plants sway in a slow current. There are three scenes: **Riverscape**, a planted freshwater aquarium; **Bunny**, a lop rabbit in a sunny room whose cursor is a broom — wave it and the rabbit chases and bites it; and **Muse**, who turns a full circle to change among Everyday, Shanghai, London and Tokyo. Switch between them from the menu bar.
 
 The scenes are rendered live with Three.js and WebGL2. Everything runs locally, with no account or internet connection needed after setup. Desktop wallpaper support is **macOS only** for now; you can also try either scene in a browser.
 
@@ -36,11 +38,12 @@ You don't need Node.js for the wallpaper. If you already have it, `npm run wallp
 
 ## Use the wallpaper
 
-Click the fish (or hare) icon in the menu bar:
+Click the fish, hare or shirt icon in the menu bar:
 
 - **Feed** drops ten pellets into each screen's tank, or puts a carrot down for the rabbit. Uneaten pellets dissolve after 20–40 seconds of running simulation time, measured from when they touch the water.
+- **Change outfit · 转身换装** turns Muse to the next look. The last outfit is remembered.
 - **Pause / Resume** controls the animation. Your choice is remembered across restarts.
-- **Scene** switches between Riverscape and Bunny. The choice is remembered.
+- **Scene** switches between Riverscape, Bunny and Muse. The choice is remembered.
 - **Quit** closes the app until you open it again or next sign in.
 
 ### Bunny
@@ -125,7 +128,7 @@ With Node.js 20 or newer, run this from the project folder:
 npm start
 ```
 
-Open [the local preview](http://127.0.0.1:8080) for Riverscape, or `/scenes/bunny/` for the rabbit. There is no `npm install` step; the library is included. Use `PORT=8081 npm start` if port 8080 is busy, and Ctrl+C to stop the server.
+Open [the local preview](http://127.0.0.1:8080) for Riverscape, `/scenes/bunny/` for the rabbit, or `/scenes/muse/` for dress-up. There is no `npm install` step; the library is included. Use `PORT=8081 npm start` if port 8080 is busy, and Ctrl+C to stop the server.
 
 - Click the water to drop food, and to rebait a bare hook.
 - Move the pointer near the fish to interact. The pointer is the hook and line; the browser's own cursor is hidden while the scene is running.
@@ -137,7 +140,7 @@ Reduce Motion starts the preview paused. Serve the page over HTTP; opening `inde
 
 One water model drives the plants, drifting particles, fish and underwater lighting. Fish alternate between swimming and coasting, explore the tank, avoid neighbours and compete for pellets. The scene uses raster rendering with custom GLSL shaders, shadows and depth effects.
 
-Riverscape lives in `scenes/riverscape/`, including its textures and tests, and Bunny in `scenes/bunny/` (`scene.js` the room, `rabbit.js` the rabbit and its behaviour, `broom.js` the cursor, `pet-state.js` what it remembers). The Mac app lists the scenes in `wallpaper/Wallpaper.swift` and shows the chosen one; a scene keeps its state through the app's `state` message handler, since the wallpaper's web view stores nothing itself.
+Riverscape lives in `scenes/riverscape/`, including its textures and tests; Bunny in `scenes/bunny/` (`scene.js` the room, `rabbit.js` the rabbit and its behaviour, `broom.js` the cursor, `pet-state.js` what it remembers); and Muse in `scenes/muse/` (photographic atlases, city backdrops, and a turntable that only draws while changing outfits). The Mac app lists the scenes in `wallpaper/Wallpaper.swift` and shows the chosen one; a scene keeps its state through the app's `state` message handler, since the wallpaper's web view stores nothing itself.
 
 | Files | Purpose |
 | --- | --- |

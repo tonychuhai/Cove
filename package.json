@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Living desktop scenes for macOS: a fishable aquarium and a broom-chasing rabbit. Built on Desktop Habitats by Chase Lean.",
+  "description": "Living desktop scenes for macOS: a fishable aquarium, a broom-chasing rabbit, and a dress-up companion. Built on Desktop Habitats by Chase Lean.",
   "scripts": {
     "start": "node serve.mjs",
     "wallpaper": "sh wallpaper/install.sh",
     "unwallpaper": "sh wallpaper/uninstall.sh",
     "check": "node --check serve.mjs && for f in scenes/*/src/*.js; do node --check \"$f\" || exit 1; done",
-    "test": "node scenes/riverscape/tests/fish-behavior.mjs && node scenes/riverscape/tests/render-policy.mjs && node scenes/riverscape/tests/plant-budget.mjs"
+    "test": "node scenes/riverscape/tests/fish-behavior.mjs && node scenes/riverscape/tests/render-policy.mjs && node scenes/riverscape/tests/plant-budget.mjs && node scenes/muse/tests/turntable.mjs"
   }
 }
