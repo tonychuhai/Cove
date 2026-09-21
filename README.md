@@ -96,6 +96,8 @@ sh wallpaper/install.sh
 
 ## 致谢与许可
 
-Cove 基于 Chase Lean 的 [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats)：Riverscape 鱼缸的水、植物、鱼，以及 macOS 壁纸 App 都是他的工作，MIT 协议；钓线、青鳉、兔子场景、Muse 互动换装、纸上小伙伴和场景菜单是 Cove 加的。两份版权声明都保留在 [LICENSE](LICENSE) 里，Cove 同样采用 MIT。纸上小伙伴改编自 GordenSun 的 [little-critters](https://github.com/GordenSun/little-critters)。
+Cove 以 [AGPL-3.0](LICENSE) 开源：可以自由使用、修改、分发，改了要开源，拿去做网络服务也要开源。
+
+Cove 基于 Chase Lean 的 [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats)：Riverscape 鱼缸的水、植物、鱼，以及 macOS 壁纸 App 都是他的工作，MIT 协议，声明保留在 [NOTICE](NOTICE)；钓线、青鳉、兔子场景、Muse 互动换装、纸上小伙伴和场景切换是 Cove 加的。纸上小伙伴改编自 GordenSun 的 [little-critters](https://github.com/GordenSun/little-critters)。
 
 Three.js 0.180.0 以 [MIT](vendor/THREE-LICENSE.txt) 附带。石头、木头、沙子纹理来自 Poly Haven（[CC0](https://polyhaven.com/license)）：[Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry)、[Rough Wood](https://polyhaven.com/a/rough_wood)、[Sand 01](https://polyhaven.com/a/sand_01)。

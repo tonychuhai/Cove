@@ -170,6 +170,6 @@ If you change the app's bundle ID, update `com.tonyzhu.cove` in `wallpaper/insta
 
 ## Credits and license
 
-Cove is [MIT licensed](../LICENSE). It started from [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats), copyright Chase Lean, also MIT; his notice is kept in the LICENSE file alongside ours. Three.js 0.180.0 is bundled under its [MIT license](../vendor/THREE-LICENSE.txt).
+Cove is released under the [GNU AGPL-3.0](../LICENSE). It started from [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats), copyright Chase Lean, MIT; his notice is kept in [NOTICE](../NOTICE). The Critters scene is adapted from [little-critters](https://github.com/GordenSun/little-critters) by GordenSun. Three.js 0.180.0 is bundled under its [MIT license](../vendor/THREE-LICENSE.txt).
 
 The rock, wood and sand textures come from Poly Haven under [CC0](https://polyhaven.com/license): [Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry), [Rough Wood](https://polyhaven.com/a/rough_wood) and [Sand 01](https://polyhaven.com/a/sand_01).

@@ -154,6 +154,8 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
   private var readyHandlers: [() -> Void] = []
   private var ready = false
   private var readyPolls = 0
+  private let born = ProcessInfo.processInfo.systemUptime
+  private let sceneID = currentHabitat.id
 
   /// Invisible until told otherwise, so a scene that takes seconds to compile can be
   /// brought up behind the one it replaces and shown only once it has a frame to show.
@@ -264,30 +266,32 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
   private func becomeReady() {
     guard !ready else { return }
     ready = true
+    NSLog("cove: \(sceneID) showed its first frame after %.1f s", ProcessInfo.processInfo.systemUptime - born)
     let handlers = readyHandlers
     readyHandlers = []
     for handler in handlers { handler() }
   }
 
-  /// The scenes cover themselves with #loading until their first frame; a page without
-  /// one is ready as soon as it has loaded.
+  /// The scenes cover themselves with #loading until their first frame, then start
+  /// fading it. The moment the fade is asked for is the moment there is a picture; a
+  /// page without such a cover is ready as soon as it has loaded.
   private func pollReady() {
     readyPolls += 1
     view.evaluateJavaScript(
       """
       (() => {
         const loading = document.querySelector('#loading');
-        if (!loading || loading.hidden) return true;
+        if (!loading || loading.hidden || loading.style.opacity === '0') return true;
         const style = getComputedStyle(loading);
         return style.display === 'none' || style.opacity === '0';
       })()
       """
     ) { [weak self] value, _ in
       guard let self else { return }
-      if value as? Bool == true || self.readyPolls > 60 {
+      if value as? Bool == true || self.readyPolls > 150 {
         self.becomeReady()
       } else {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.pollReady() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.pollReady() }
       }
     }
   }

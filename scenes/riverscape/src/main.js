@@ -28,6 +28,9 @@ let onBattery = false;
 let settings = renderSettings({ profile, wallpaper, pixelRatio: devicePixelRatio });
 let requestedRate = wallpaper ? 0 : 60;
 let loop = null, applyPower = null;
+// The first frames go out at a fraction of the resolution, so a scene change has
+// something to show within the second; the full budget follows over the next moments.
+let warmup = 0.55;
 window.habitatRate = (fps) => {
   requestedRate = Number.isFinite(fps) && fps > 0 ? Math.min(120, fps) : 0;
   loop?.setRate(requestedRate);
@@ -215,7 +218,7 @@ async function start() {
     const bounds = canvas.getBoundingClientRect();
     // DPR may change when a preview moves between monitors.
     settings = renderSettings({ profile, wallpaper, pixelRatio: devicePixelRatio, onBattery });
-    const dimensions = framebufferSize(bounds.width, bounds.height, settings.resolution, maxDimension);
+    const dimensions = framebufferSize(bounds.width, bounds.height, settings.resolution * warmup, maxDimension);
     zeroSize = !dimensions;
     visibility();
     if (!dimensions) return;
@@ -383,6 +386,10 @@ async function start() {
       ready = true;
       loading.style.opacity = 0;
       setTimeout(() => { loading.hidden = true; }, 850);
+      // Step up to the full resolution now that there is a picture to improve on.
+      for (const [delay, scale] of [[350, 0.8], [900, 1]]) {
+        setTimeout(() => { warmup = scale; resize(); }, delay);
+      }
     }
   }
   loop = createFrameLoop(renderFrame, {

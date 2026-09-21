@@ -1,7 +1,7 @@
 {
   "name": "cove",
   "version": "0.1.0",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "description": "Living desktop scenes for macOS: a fishable aquarium, a broom-chasing rabbit, a dress-up companion, and a sketchbook of little animals. Built on Desktop Habitats by Chase Lean.",
   "scripts": {
