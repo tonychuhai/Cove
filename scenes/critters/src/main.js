@@ -79,9 +79,13 @@ function fillGrid(seed, number, silent) {
   batchNo = number;
   const count = cols * rows;
   const batch = generateBatch(count, rng);
+  // A stopped wallpaper draws one frame and no more, so a quiet fill has everyone already
+  // in place; with the clock running they file in one after another as before.
+  const instant = silent && hostRate === 0;
   animals = batch.map((b, i) => {
     const col = i % cols, row = Math.floor(i / cols);
     const a = new Animal(b, col, row, rng, now, silent ? 0 : 0.28 + col * 0.05 + row * 0.08 + rng.range(0, 0.06));
+    if (instant) a.born = now - 1;
     place(a);
     return a;
   });

@@ -14,6 +14,15 @@
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
+#scene-switch .brand {
+  padding: 6px 0 4px;
+  color: #f6f1ea;
+  font: 700 11px/1 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-align: center;
+  opacity: 0.85;
+}
 #scene-switch button {
   appearance: none;
   width: 58px;

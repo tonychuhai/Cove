@@ -32,7 +32,12 @@ function go(id, button) {
 const here = currentScene();
 const nav = document.createElement("nav");
 nav.id = "scene-switch";
-nav.setAttribute("aria-label", "切换场景");
+nav.setAttribute("aria-label", "Cove · 切换场景");
+const brand = document.createElement("div");
+brand.className = "brand";
+brand.setAttribute("aria-hidden", "true");
+brand.textContent = "Cove";
+nav.append(brand);
 for (const scene of SCENES) {
   const button = document.createElement("button");
   button.type = "button";

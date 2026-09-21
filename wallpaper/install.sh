@@ -77,19 +77,9 @@ PLIST
 launchctl bootstrap "$domain" "$agent"
 launchctl kickstart -k "$domain/$label"
 
-# The desktop picture behind the live layer: what login, Mission Control and Stage Manager
-# show before the scene is drawing. It is a frame of the scene itself.
-still="$HOME/Pictures/Cove.png"
-mkdir -p "$HOME/Pictures"
-echo "Waiting for the first frame, then setting the still picture."
-sleep 8
-if pid=$(pgrep -n -f "Cove.app/Contents/MacOS/Cove"); then
-	kill -USR1 "$pid" && sleep 7
-	if [ -s /tmp/cove.png ]; then
-		cp /tmp/cove.png "$still"
-		osascript -e "tell application \"System Events\" to tell every desktop to set picture to \"$still\"" >/dev/null 2>&1 ||
-			echo "Could not set the still picture; the live layer covers it anyway."
-	fi
-fi
+# The app keeps a frame of the current scene as the desktop picture under the live layer
+# (what the lock screen shows), so nothing is set from here. Earlier versions wrote it to
+# ~/Pictures/Cove.png; that file is no longer used and may be deleted.
 
 echo "Cove installed: $app"
+echo "The first frame takes a few seconds; the lock screen follows the scene a moment later."

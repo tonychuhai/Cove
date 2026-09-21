@@ -32,7 +32,7 @@ sh wallpaper/install.sh
 
 The script builds the app for your Mac, installs it at `~/Applications/Cove.app`, and starts it. It also adds a login item so the aquarium starts when you sign in. Allow about 20 seconds for the first frame to appear.
 
-During installation, macOS may ask whether Terminal can control System Events. This lets the installer set a still image of the aquarium as your desktop picture, underneath the animation. You can decline; the live wallpaper will still work.
+The app keeps a frame of the current scene as your desktop picture, underneath the animation: that is what the lock screen, Mission Control and Stage Manager show, and it follows the scene a few seconds after each change. To leave your desktop picture alone: `defaults write com.tonyzhu.cove still -bool false`.
 
 You don't need Node.js for the wallpaper. If you already have it, `npm run wallpaper` runs the same installer.
 
@@ -89,7 +89,7 @@ The wallpaper reads your cursor position so the fish can react. It also checks w
 
 Once installed, the aquarium works offline. Its code, textures and Three.js library are bundled with the app. There are no analytics or external services.
 
-The app does not request Accessibility, Input Monitoring or Screen Recording access. The optional System Events prompt during installation is for changing the still desktop picture.
+The app does not request Accessibility, Input Monitoring or Screen Recording access. Setting the still desktop picture is done by the app itself and needs no prompt.
 
 ### Why have the fish stopped moving?
 
@@ -117,9 +117,9 @@ From the project folder, run:
 sh wallpaper/uninstall.sh
 ```
 
-Or use `npm run unwallpaper`. This stops the app, removes its login item and deletes the installed app.
+Or use `npm run unwallpaper`. This stops the app, removes its login item, and deletes the installed app and its still frames in `~/Library/Application Support/Cove`.
 
-The still image at `~/Pictures/Cove.png` stays behind, along with the desktop picture setting. Choose your previous wallpaper in System Settings, then delete the image if you no longer want it. The saved pause preference is also retained.
+The desktop picture setting still points at a deleted frame, so choose your previous wallpaper in System Settings. Earlier versions kept the frame at `~/Pictures/Cove.png`; delete it if it is there. The saved pause preference is also retained.
 
 ## Try it in a browser
 

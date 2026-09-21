@@ -433,6 +433,13 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
     }
   }
 
+  /// Whether the page has given up and is showing its error instead of a scene.
+  func showingError(_ done: @escaping (Bool) -> Void) {
+    view.evaluateJavaScript("Boolean(document.querySelector('#loading[role=\"alert\"]'))") { value, _ in
+      done(value as? Bool ?? true)
+    }
+  }
+
   /// What this screen is showing right now. The agent has no window of its own to look
   /// at, so this is how it can be checked.
   func snapshot(to file: URL, then done: @escaping () -> Void) {
@@ -555,6 +562,47 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
   }
 
+  // MARK: - The still picture
+
+  /// The desktop picture under the live layer is what the lock screen, Mission Control
+  /// and Stage Manager show, so it follows the scene: a frame is taken a few seconds after
+  /// each change, once the scene has settled. Always a new file, because the lock screen
+  /// caches the picture by path and would keep an old frame if the same file were
+  /// rewritten. Off with `defaults write com.tonyzhu.cove still -bool false`.
+  private var stillWork: DispatchWorkItem?
+  private var stillFolder: URL {
+    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("Cove/still", isDirectory: true)
+  }
+  private func scheduleStill() {
+    guard UserDefaults.standard.object(forKey: "still") as? Bool ?? true else { return }
+    stillWork?.cancel()
+    let work = DispatchWorkItem { [weak self] in self?.captureStill() }
+    stillWork = work
+    DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: work)
+  }
+  private func captureStill() {
+    guard let first = screens.first else { return }
+    // A scene that failed to load must not become the lock screen.
+    first.showingError { [weak self] failed in
+      guard let self, !failed, self.screens.first === first else { return }
+      let folder = self.stillFolder
+      let files = FileManager.default
+      try? files.createDirectory(at: folder, withIntermediateDirectories: true)
+      let file = folder.appendingPathComponent("\(currentHabitat.id)-\(Int(Date().timeIntervalSince1970)).png")
+      first.snapshot(to: file) {
+        guard files.fileExists(atPath: file.path) else { return }
+        for screen in NSScreen.screens {
+          try? NSWorkspace.shared.setDesktopImageURL(file, for: screen, options: [:])
+        }
+        for old in (try? files.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        where old.lastPathComponent != file.lastPathComponent {
+          try? files.removeItem(at: old)
+        }
+      }
+    }
+  }
+
   // Putting a full-screen window on a screen is itself a screen-parameter change, so the
   // arrangement is compared before anything is rebuilt.
   @objc private func screensChanged() {
@@ -570,6 +618,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     retiring = []
     screens = NSScreen.screens.map { Wallpaper(screen: $0, root: root) }
     applyRate()
+    screens.first?.whenReady { [weak self] in self?.scheduleStill() }
   }
 
   /// A scene change the person is watching. The old scene stays up while the new one
@@ -597,6 +646,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
           for screen in leaving { screen.close() }
         }
+        self.scheduleStill()
       }
     }
   }
