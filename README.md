@@ -4,7 +4,7 @@
 
 Living scenes for your Mac desktop: an aquarium whose fish you can feed and fish for, and a lop rabbit that chases the broom your cursor has become.
 
-Cove is built on [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats) by Chase Lean. The Riverscape aquarium, its water, plants and fish, and the macOS wallpaper app are his work, used under the MIT license; the fishing line, the medaka, the Bunny scene and the scene menu were added here. The app bundle is still called Desktop Habitats for now.
+Cove is built on [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats) by Chase Lean. The Riverscape aquarium, its water, plants and fish, and the macOS wallpaper app are his work, used under the MIT license; the fishing line, the medaka, the Bunny scene and the scene menu were added here.
 
 Have you always wanted an aquarium? Now you can have it, right on your desktop :)
 
@@ -26,7 +26,7 @@ Wait for that installation to finish. Download and unzip this repository, or clo
 sh wallpaper/install.sh
 ```
 
-The script builds the app for your Mac, installs it at `~/Applications/Desktop Habitats.app`, and starts it. It also adds a login item so the aquarium starts when you sign in. Allow about 20 seconds for the first frame to appear.
+The script builds the app for your Mac, installs it at `~/Applications/Cove.app`, and starts it. It also adds a login item so the aquarium starts when you sign in. Allow about 20 seconds for the first frame to appear.
 
 During installation, macOS may ask whether Terminal can control System Events. This lets the installer set a still image of the aquarium as your desktop picture, underneath the animation. You can decline; the live wallpaper will still work.
 
@@ -101,7 +101,7 @@ No. The installed app has its own copy of the scene and runs independently. You 
 
 ### How do I update it?
 
-Download or pull the latest source, then rerun `sh wallpaper/install.sh` from the project folder. Editing the source alone does not update the installed app. If you installed the earlier Aquatica version, the installer removes its app and login item before starting Desktop Habitats. Its old still image and saved preference are left behind; the new app starts with its own preference.
+Download or pull the latest source, then rerun `sh wallpaper/install.sh` from the project folder. Editing the source alone does not update the installed app. If you installed the earlier Desktop Habitats or Aquatica version, the installer removes its app and login item before starting Cove, and carries Desktop Habitats' settings (scene, pause, the rabbit's memory) over. Old still images are left behind.
 
 ### How do I remove it and get my old wallpaper back?
 
@@ -113,7 +113,7 @@ sh wallpaper/uninstall.sh
 
 Or use `npm run unwallpaper`. This stops the app, removes its login item and deletes the installed app.
 
-The still image at `~/Pictures/Desktop Habitats.png` stays behind, along with the desktop picture setting. Choose your previous wallpaper in System Settings, then delete the image if you no longer want it. The saved pause preference is also retained.
+The still image at `~/Pictures/Cove.png` stays behind, along with the desktop picture setting. Choose your previous wallpaper in System Settings, then delete the image if you no longer want it. The saved pause preference is also retained.
 
 ## Try it in a browser
 
@@ -158,9 +158,9 @@ These check JavaScript syntax; simulate swimming, spacing, startle responses and
 
 The default rendering profile is `balanced`. Append `?quality=reference&still=1` to a scene page for the original density/render budgets at simulation time zero, or `?still=1` for the optimized still. Append `diagnostics=1` to enable the local `habitatBenchmark()` function. Nothing is uploaded.
 
-Browser errors appear in the developer console. Wallpaper errors and frame-rate changes go to `/tmp/desktop-habitats.log`. Sending `SIGUSR1` to the Desktop Habitats process saves a snapshot of its first tank to `/tmp/desktop-habitats.png`.
+Browser errors appear in the developer console. Wallpaper errors and frame-rate changes go to `/tmp/cove.log`. Sending `SIGUSR1` to the Cove process saves a snapshot of its first screen to `/tmp/cove.png`.
 
-If you change the app's bundle ID, update `com.chaselean.desktop-habitats` in `wallpaper/install.sh`, `wallpaper/uninstall.sh` and `wallpaper/Info.plist` together.
+If you change the app's bundle ID, update `com.tonyzhu.cove` in `wallpaper/install.sh`, `wallpaper/uninstall.sh` and `wallpaper/Info.plist` together.
 
 ## Credits and license
 

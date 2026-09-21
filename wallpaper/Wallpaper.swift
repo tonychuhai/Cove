@@ -14,7 +14,7 @@ import Cocoa
 import WebKit
 import IOKit.ps
 
-let sceneScheme = "desktop-habitats"
+let sceneScheme = "cove"
 let sceneHost = "local"
 
 /// The scenes the app can show. Each lives in scenes/<id>/ with a wallpaper.html; the
@@ -77,6 +77,11 @@ final class SceneHandler: NSObject, WKURLSchemeHandler {
     "json": "application/json",
     "jpg": "image/jpeg",
     "png": "image/png",
+    "webp": "image/webp",
+    "svg": "image/svg+xml",
+    "bin": "application/octet-stream",
+    "gltf": "model/gltf+json",
+    "glb": "model/gltf-binary",
   ]
 
   init(root: URL) { self.root = root.standardizedFileURL }
@@ -91,9 +96,14 @@ final class SceneHandler: NSObject, WKURLSchemeHandler {
       return
     }
     let type = Self.types[file.pathExtension.lowercased()] ?? "application/octet-stream"
-    task.didReceive(
-      URLResponse(
-        url: url, mimeType: type, expectedContentLength: data.count, textEncodingName: nil))
+    // A real HTTP response, so that fetch() and Three's loaders see a 200 rather than
+    // the status 0 a bare URLResponse reports, which they treat as failure.
+    let response =
+      HTTPURLResponse(
+        url: url, statusCode: 200, httpVersion: "HTTP/1.1",
+        headerFields: ["Content-Type": type, "Content-Length": String(data.count)])
+      ?? URLResponse(url: url, mimeType: type, expectedContentLength: data.count, textEncodingName: nil)
+    task.didReceive(response)
     task.didReceive(data)
     task.didFinish()
   }
@@ -107,7 +117,7 @@ final class Reporter: NSObject, WKScriptMessageHandler {
   func userContentController(
     _ controller: WKUserContentController, didReceive message: WKScriptMessage
   ) {
-    NSLog("desktop-habitats page: \(message.body)")
+    NSLog("cove page: \(message.body)")
   }
 }
 
@@ -231,7 +241,7 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
       if loaded { view.evaluateJavaScript("habitatPointerOut()") }
       inside = false
     }
-    NSLog("desktop-habitats: \(rate) fps")
+    NSLog("cove: \(rate) fps")
     send()
     return true
   }
@@ -282,7 +292,7 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
     _ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
     withError error: Error
   ) {
-    NSLog("desktop-habitats: the scene did not load: \(error.localizedDescription)")
+    NSLog("cove: the scene did not load: \(error.localizedDescription)")
   }
 
   /// What the page thinks it is doing, for the log.
@@ -303,7 +313,7 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
       })()
       """
     ) { value, error in
-      NSLog("desktop-habitats page state: \(value ?? error?.localizedDescription ?? "unreadable")")
+      NSLog("cove page state: \(value ?? error?.localizedDescription ?? "unreadable")")
     }
   }
 
@@ -316,7 +326,7 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
         let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:])
       else { return }
       try? png.write(to: file)
-      NSLog("desktop-habitats: wrote \(file.path)")
+      NSLog("cove: wrote \(file.path)")
     }
   }
 }
@@ -408,7 +418,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
       CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
     }
 
-    // `kill -USR1` writes what the first screen is showing to /tmp/desktop-habitats.png.
+    // `kill -USR1` writes what the first screen is showing to /tmp/cove.png.
     signal(SIGUSR1, SIG_IGN)
     snapshots = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
     snapshots?.setEventHandler { [weak self] in self?.snapshot() }
@@ -421,7 +431,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     for screen in screens { screen.setRate(60) }
     DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
       first.probe()
-      first.snapshot(to: URL(fileURLWithPath: "/tmp/desktop-habitats.png")) {
+      first.snapshot(to: URL(fileURLWithPath: "/tmp/cove.png")) {
         self?.applyRate()
       }
     }
@@ -578,7 +588,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     menu.addItem(leave)
     item.menu = menu
     if item.button?.window == nil || !item.isVisible {
-      NSLog("desktop-habitats: the menu bar item did not appear")
+      NSLog("cove: the menu bar item did not appear")
     }
   }
 
@@ -586,12 +596,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private func brandMenuBar() {
     guard let item = status else { return }
     let habitat = currentHabitat
-    let symbol = NSImage(systemSymbolName: habitat.symbol, accessibilityDescription: "Desktop Habitats")
-      ?? NSImage(systemSymbolName: "leaf", accessibilityDescription: "Desktop Habitats")
+    let symbol = NSImage(systemSymbolName: habitat.symbol, accessibilityDescription: "Cove")
+      ?? NSImage(systemSymbolName: "leaf", accessibilityDescription: "Cove")
     symbol?.isTemplate = true
     item.button?.image = symbol
-    if symbol == nil { item.button?.title = "Desktop Habitats" }
-    item.button?.toolTip = "Desktop Habitats · \(habitat.title)"
+    if symbol == nil { item.button?.title = "Cove" }
+    item.button?.toolTip = "Cove · \(habitat.title)"
   }
 
   /// Another scene: remembered, then every screen is rebuilt around it.

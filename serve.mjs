@@ -40,5 +40,5 @@ http
     }
   })
   .listen(port, "127.0.0.1", () =>
-    console.log(`Desktop Habitats: http://localhost:${port}`),
+    console.log(`Cove: http://localhost:${port}`),
   );
