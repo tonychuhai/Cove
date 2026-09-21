@@ -267,6 +267,8 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
     guard !ready else { return }
     ready = true
     NSLog("cove: \(sceneID) showed its first frame after %.1f s", ProcessInfo.processInfo.systemUptime - born)
+    // A page with a frame has certainly defined its hooks: make sure it has the state.
+    send()
     let handlers = readyHandlers
     readyHandlers = []
     for handler in handlers { handler() }
@@ -330,13 +332,34 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
     send()
   }
 
+  /// The page only learns the rate when it changes, so one delivery has to land. A page
+  /// that has finished loading may still be evaluating its module script; until it has
+  /// defined the hooks, the state is offered again a moment later.
+  private var resending = false
+  private var resends = 0
   private func send() {
-    guard loaded else { return }
+    guard loaded, !resending else { return }
     view.evaluateJavaScript(
       """
-      typeof habitatPower === 'function' && habitatPower(\(battery ? "true" : "false"));
-      typeof habitatRate === 'function' && habitatRate(\(rate));
-      """)
+      (() => {
+        if (typeof habitatRate !== 'function') return false;
+        typeof habitatPower === 'function' && habitatPower(\(battery ? "true" : "false"));
+        habitatRate(\(rate));
+        return true;
+      })()
+      """
+    ) { [weak self] value, _ in
+      guard let self, value as? Bool != true else { return }
+      self.resends += 1
+      if self.resends == 1 { NSLog("cove: \(self.sceneID) was not listening yet; the rate will be offered again") }
+      guard self.resends <= 300 else { return }
+      self.resending = true
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        guard let self else { return }
+        self.resending = false
+        self.send()
+      }
+    }
   }
 
   /// A pinch of food on the water, asked for from the menu rather than by clicking. The
@@ -392,6 +415,7 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
         const canvas = document.querySelector('#scene');
         const context = canvas && canvas.getContext('webgl2');
         const loading = document.querySelector('#loading');
+        const stats = typeof habitatStats === 'function' ? habitatStats() : null;
         return JSON.stringify({
           pixels: canvas && [canvas.width, canvas.height],
           covered: Boolean(loading && !loading.hidden),
@@ -399,6 +423,8 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
           gpu: context && context.getParameter(context.RENDERER),
           hidden: document.hidden,
           pointers: window.habitatPointerCount,
+          frames: stats && stats.renderedFrames,
+          loop: stats && stats.loop,
         });
       })()
       """
