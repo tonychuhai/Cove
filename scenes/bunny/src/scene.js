@@ -1,394 +1,337 @@
 import * as THREE from "three";
-
-// A bright room in the morning: a pale wall with the window's light falling across it,
-// a glossy floor the rabbit lives on, a rug with a crochet carrot, a pot plant at the
-// edge of the frame and a mug and a few books against the wall. Dust turns in the sun.
-//
-// The wall and the plant are painted onto canvases once and shown as planes; everything
-// the light has to touch, the floor, the rug and the rabbit, is real geometry so the sun
-// can throw shadows across it.
+import { createVilla } from "./villa.js";
 
 export const WALL_Z = -6;
 export const FLOOR_NEAR_Z = 5.5;
 const WALL_SIZE = [30, 12];
-const WALL_CENTER_Y = 4.6;
+const seeded = (seed) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 
-const seeded = (seed) => () => {
-  seed = (seed * 1664525 + 1013904223) >>> 0;
-  return seed / 4294967296;
-};
-
-function canvasTexture(width, height, paint) {
+function texture(width, height, draw, color = true) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  paint(canvas.getContext("2d"), width, height);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  return texture;
+  draw(canvas.getContext("2d"), width, height);
+  const result = new THREE.CanvasTexture(canvas);
+  if (color) result.colorSpace = THREE.SRGBColorSpace;
+  result.anisotropy = 8;
+  return result;
 }
 
-// Wall canvas pixel for a world (x, y) on the wall plane.
-function wallPx(width, height) {
-  const [w, h] = WALL_SIZE;
-  return (x, y) => [((x + w / 2) / w) * width, (1 - (y - (WALL_CENTER_Y - h / 2)) / h) * height];
+// Static meshes are combined so dozens of individually curved leaves and stems cost
+// two draw calls, while retaining their real silhouettes, highlights and shadows.
+function mergeGeometry(parts) {
+  const expanded = parts.map((part) => part.index ? part.toNonIndexed() : part);
+  const attributes = ["position", "normal", "uv", "color"].filter((name) => expanded.every((part) => part.attributes[name]));
+  const merged = new THREE.BufferGeometry();
+  for (const name of attributes) {
+    const size = expanded[0].attributes[name].itemSize;
+    const array = new Float32Array(expanded.reduce((sum, part) => sum + part.attributes[name].array.length, 0));
+    let offset = 0;
+    for (const part of expanded) {
+      array.set(part.attributes[name].array, offset);
+      offset += part.attributes[name].array.length;
+    }
+    merged.setAttribute(name, new THREE.BufferAttribute(array, size));
+  }
+  for (const part of new Set([...parts, ...expanded])) part.dispose();
+  merged.computeBoundingSphere();
+  return merged;
 }
 
-// A patch of sunlight: a soft-edged parallelogram, brightest in the middle.
-function sunPatch(ctx, points, alpha) {
-  ctx.save();
-  ctx.filter = "blur(18px)";
-  ctx.fillStyle = `rgba(255, 238, 205, ${alpha})`;
-  ctx.beginPath();
-  points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function paintWall(ctx, width, height) {
-  const random = seeded(2024);
-  const px = wallPx(width, height);
-  const [, floorRow] = px(0, 0);
-  // Pale blue, lighter and warmer toward the floor where the light bounces up. The
-  // camera sees about seven units either side of centre on this wall.
-  const wall = ctx.createLinearGradient(0, 0, 0, floorRow);
-  wall.addColorStop(0, "#9fb9e4");
-  wall.addColorStop(0.5, "#c3d4ee");
-  wall.addColorStop(1, "#e4ebf5");
-  ctx.fillStyle = wall;
-  ctx.fillRect(0, 0, width, height);
-
-  // Light from a tall window off to the right, thrown across the wall in panes.
-  for (const [x0, x1, skew, alpha] of [[1.6, 3.6, 1.6, 0.7], [4.3, 6.3, 1.6, 0.65], [7.0, 9.0, 1.4, 0.5]]) {
-    const [ax, ay] = px(x0 + skew, 9.2);
-    const [bx, by] = px(x1 + skew, 9.2);
-    const [cx, cy] = px(x1, 0.3);
-    const [dx, dy] = px(x0, 0.3);
-    sunPatch(ctx, [[ax, ay], [bx, by], [cx, cy], [dx, dy]], alpha);
-  }
-  // Leaf shadows dancing in the light: a few dark blots, very soft.
-  ctx.save();
-  ctx.filter = "blur(10px)";
-  for (let i = 0; i < 12; i++) {
-    const [x, y] = px(2 + random() * 7, 1 + random() * 7);
-    ctx.fillStyle = `rgba(90, 110, 140, ${0.06 + random() * 0.08})`;
-    ctx.beginPath();
-    ctx.ellipse(x, y, 40 + random() * 60, 22 + random() * 30, random() * Math.PI, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-
-  // Skirting board.
-  const [, skirtTop] = px(0, 0.28);
-  ctx.fillStyle = "#f3f1ec";
-  ctx.fillRect(0, skirtTop, width, floorRow - skirtTop);
-  ctx.fillStyle = "rgba(140, 150, 170, 0.35)";
-  ctx.fillRect(0, skirtTop, width, 3);
-
-  // A stack of books against the wall on the left, and a mug on its side beside them,
-  // the way they were in the picture that started this.
-  const scale = width / WALL_SIZE[0];
-  const books = [
-    ["Happier Me", "#f6f1e6", "#e0b23c"],
-    ["More Carrots", "#efe9dd", "#e4713a"],
-    ["A Cuter Life", "#f7f3ea", "#c96a7e"],
-  ];
-  let [bx, by] = px(-6.2, 0.28);
-  const bookW = 2.4 * scale, bookH = 0.36 * scale;
-  books.forEach(([title, paper, tab], i) => {
-    const jitter = (random() - 0.5) * 0.2 * scale;
-    const x = bx + jitter, y = by - bookH * (i + 1);
-    ctx.fillStyle = paper;
-    ctx.fillRect(x, y, bookW, bookH);
-    ctx.fillStyle = "rgba(0,0,0,0.08)";
-    ctx.fillRect(x, y + bookH - 4, bookW, 4);
-    ctx.fillStyle = tab;
-    ctx.fillRect(x + bookW - 0.28 * scale, y + bookH * 0.3, 0.14 * scale, bookH * 0.4);
-    ctx.fillStyle = "#4a4238";
-    ctx.font = `500 ${bookH * 0.42}px "Helvetica Neue", Arial, sans-serif`;
-    ctx.textBaseline = "middle";
-    ctx.fillText(title, x + 0.22 * scale, y + bookH * 0.52);
-  });
-  // The mug, lying down, mouth toward us, a rabbit face on its side.
-  const [mx, my] = px(-6.5, 0.28);
-  const mugW = 1.7 * scale, mugH = 1.25 * scale;
-  ctx.fillStyle = "#f8f6f1";
-  ctx.beginPath();
-  ctx.roundRect(mx - mugW, my - mugH, mugW, mugH, 0.12 * scale);
-  ctx.fill();
-  ctx.fillStyle = "#e9e5dc";
-  ctx.beginPath();
-  ctx.ellipse(mx, my - mugH / 2, 0.22 * scale, mugH / 2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#5a5148";
-  ctx.lineWidth = 3;
-  const fx = mx - mugW * 0.55, fy = my - mugH * 0.5;
-  ctx.beginPath();
-  ctx.ellipse(fx, fy, 0.22 * scale, 0.2 * scale, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.ellipse(fx + s * 0.1 * scale, fy - 0.3 * scale, 0.07 * scale, 0.17 * scale, s * 0.15, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.fillStyle = "#5a5148";
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.arc(fx + s * 0.08 * scale, fy - 0.03 * scale, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // A soft contact shadow along the base of the wall.
-  const shade = ctx.createLinearGradient(0, floorRow - 26, 0, floorRow);
-  shade.addColorStop(0, "rgba(90, 100, 130, 0)");
-  shade.addColorStop(1, "rgba(90, 100, 130, 0.18)");
-  ctx.fillStyle = shade;
-  ctx.fillRect(0, floorRow - 26, width, 26);
-}
-
-// The pot plant at the right edge of the frame, on a transparent plane in front of the
-// scene: a terracotta pot and a spray of heart-shaped leaves on arching stems.
-function paintPlant(ctx, width, height, halfW, halfH) {
-  const random = seeded(99);
-  const toPx = (x, y) => [((x + halfW) / (2 * halfW)) * width, (1 - (y + halfH) / (2 * halfH)) * height];
-  const scale = width / (2 * halfW);
-  // Pot, its left third inside the frame.
-  const potX = halfW + 0.45, potY = -halfH + 0.55;
-  const [px, py] = toPx(potX, potY);
-  ctx.fillStyle = "#c97a55";
-  ctx.beginPath();
-  ctx.moveTo(px - 1.15 * scale, py - 1.35 * scale);
-  ctx.lineTo(px + 1.15 * scale, py - 1.35 * scale);
-  ctx.lineTo(px + 0.95 * scale, py);
-  ctx.lineTo(px - 0.95 * scale, py);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#d98a62";
-  ctx.fillRect(px - 1.2 * scale, py - 1.55 * scale, 2.4 * scale, 0.26 * scale);
-  ctx.fillStyle = "rgba(60,30,20,0.25)";
-  ctx.fillRect(px - 1.15 * scale, py - 1.35 * scale, 0.35 * scale, 1.35 * scale);
-  // Stems and leaves.
-  const leaf = (x, y, size, angle, tone) => {
+function wallFinish() {
+  return texture(2048, 1024, (ctx, w, h) => {
+    const random = seeded(12);
+    const gradient = ctx.createLinearGradient(0, 0, w * 0.8, h);
+    gradient.addColorStop(0, "#6c86af");
+    gradient.addColorStop(0.5, "#8da5c8");
+    gradient.addColorStop(1, "#bac9dc");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h);
+    const point = (x, y) => [(x / WALL_SIZE[0] + 0.5) * w, (1 - y / WALL_SIZE[1]) * h];
+    // A broad window projects a softly defocused grid onto the painted plaster.
+    // Keeping the projection in the wall material avoids translucent floating planes.
     ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle);
-    ctx.fillStyle = tone;
-    ctx.beginPath();
-    ctx.moveTo(0, size * 0.55);
-    ctx.bezierCurveTo(-size * 0.75, size * 0.1, -size * 0.7, -size * 0.7, 0, -size * 0.45);
-    ctx.bezierCurveTo(size * 0.7, -size * 0.7, size * 0.75, size * 0.1, 0, size * 0.55);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.28)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, size * 0.5);
-    ctx.lineTo(0, -size * 0.35);
-    ctx.stroke();
+    ctx.filter = "blur(6px)";
+    for (let column = 0; column < 3; column++) {
+      for (let row = 0; row < 4; row++) {
+        const x = 1.0 + column * 2.15;
+        const y = 0.38 + row * 2.2;
+        const corners = [[x + y * 0.29, y], [x + 1.9 + y * 0.29, y], [x + 1.9 + (y + 1.98) * 0.29, y + 1.98], [x + (y + 1.98) * 0.29, y + 1.98]];
+        ctx.fillStyle = `rgba(255,225,179,${0.53 - column * 0.04})`;
+        ctx.beginPath();
+        corners.map(([a, b]) => point(a, b)).forEach(([a, b], i) => i ? ctx.lineTo(a, b) : ctx.moveTo(a, b));
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
     ctx.restore();
-  };
-  ctx.strokeStyle = "#5f8a4e";
-  ctx.lineCap = "round";
-  for (let s = 0; s < 7; s++) {
-    const [sx, sy] = toPx(potX - 0.3 + random() * 0.6, potY - 1.3);
-    const reach = 1.6 + random() * 2.2;
-    const angle = -Math.PI / 2 - 0.25 - random() * 0.9;
-    const ex = sx + Math.cos(angle) * reach * scale;
-    const ey = sy + Math.sin(angle) * reach * scale;
-    const cx = sx + Math.cos(angle - 0.5) * reach * scale * 0.6;
-    const cy = sy + Math.sin(angle - 0.5) * reach * scale * 0.6;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.quadraticCurveTo(cx, cy, ex, ey);
-    ctx.stroke();
-    const leaves = 3 + Math.floor(random() * 3);
-    for (let i = 0; i < leaves; i++) {
-      const t = 0.3 + (i / leaves) * 0.75;
-      const lx = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * cx + t * t * ex;
-      const ly = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * cy + t * t * ey;
-      const tone = `hsl(${115 + random() * 25}, ${40 + random() * 20}%, ${30 + random() * 22}%)`;
-      leaf(lx, ly, (0.5 + random() * 0.45) * scale, random() * Math.PI * 2, tone);
+    // Fine plaster variation is deliberately subpixel and low contrast.
+    for (let i = 0; i < 23000; i++) {
+      ctx.fillStyle = random() > 0.5 ? "rgba(255,255,255,.022)" : "rgba(30,45,65,.02)";
+      ctx.fillRect(random() * w, random() * h, 1.2, 1.2);
+    }
+    const shade = ctx.createLinearGradient(0, h - 22, 0, h);
+    shade.addColorStop(0, "rgba(42,50,65,0)");
+    shade.addColorStop(1, "rgba(42,50,65,.20)");
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, h - 22, w, 22);
+  });
+}
+
+function floorFinish() {
+  return texture(2048, 2048, (ctx, w, h) => {
+    const random = seeded(67);
+    ctx.fillStyle = "#ded9cc";
+    ctx.fillRect(0, 0, w, h);
+    const boardWidth = w / 34;
+    for (let board = 0; board < 34; board++) {
+      const x = board * boardWidth;
+      const tone = 214 + Math.floor(random() * 12);
+      ctx.fillStyle = `rgb(${tone + 9},${tone + 4},${tone - 7})`;
+      ctx.fillRect(x + 0.5, 0, boardWidth - 1, h);
+      for (let grain = 0; grain < 75; grain++) {
+        const gx = x + random() * boardWidth;
+        const start = random() * h;
+        const length = 50 + random() * 900;
+        ctx.strokeStyle = `rgba(110,94,69,${0.015 + random() * 0.025})`;
+        ctx.lineWidth = 0.3 + random() * 0.7;
+        ctx.beginPath();
+        ctx.moveTo(gx, start);
+        ctx.bezierCurveTo(gx + 3, start + length * 0.3, gx - 4, start + length * 0.7, gx + 1, start + length);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(112,105,89,.14)";
+      ctx.lineWidth = 0.7;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      for (let joint = -1; joint < 4; joint++) {
+        const y = joint * h / 3 + (board % 3) * h / 9;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + boardWidth, y); ctx.stroke();
+      }
+    }
+  });
+}
+
+function contactTexture() {
+  return texture(128, 128, (ctx, w, h) => {
+    const gradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    gradient.addColorStop(0, "rgba(53,43,30,.32)");
+    gradient.addColorStop(0.4, "rgba(53,43,30,.18)");
+    gradient.addColorStop(1, "rgba(53,43,30,0)");
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, w, h);
+  });
+}
+
+function leafGeometry(base, direction, length, width, roll, random) {
+  const rows = 14, columns = 8;
+  const vertices = [], uvs = [], indices = [], colors = [];
+  const orientation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction.clone().normalize());
+  const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll);
+  orientation.multiply(rotation);
+  const tint = new THREE.Color().setHSL(0.23 + random() * 0.045, 0.34 + random() * 0.16, 0.22 + random() * 0.09);
+  for (let row = 0; row <= rows; row++) {
+    const t = row / rows;
+    const spread = Math.pow(Math.sin(Math.PI * t), 0.7) * (1.16 - t * 0.5);
+    for (let column = 0; column <= columns; column++) {
+      const u = column / columns * 2 - 1;
+      const x = u * width * spread * 0.5;
+      const y = (1 - u * u) * width * 0.13 * Math.sin(Math.PI * t) - t * t * length * 0.20;
+      const z = length * t;
+      const p = new THREE.Vector3(x, y, z).applyQuaternion(orientation).add(base);
+      vertices.push(p.x, p.y, p.z);
+      uvs.push(column / columns, t);
+      const veinTint = tint.clone().multiplyScalar(0.94 + 0.06 * Math.abs(u));
+      colors.push(veinTint.r, veinTint.g, veinTint.b);
+      if (row < rows && column < columns) {
+        const a = row * (columns + 1) + column, b = a + columns + 1;
+        indices.push(a, b, a + 1, b, b + 1, a + 1);
+      }
     }
   }
-}
-
-function softDisc(size, rgb, power = 1.5) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  for (let i = 0; i <= 8; i++) {
-    const t = i / 8;
-    g.addColorStop(t, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.pow(1 - t, power).toFixed(3)})`);
-  }
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 export function createScenery(scene, { camera, aspect, shadows = true }) {
   const random = seeded(31337);
-  const disposables = [];
+  const group = new THREE.Group();
+  group.name = "Morning room · real geometry";
+  scene.add(group);
+  const disposables = new Set();
+  const keep = (item) => { disposables.add(item); return item; };
+  const material = (params) => keep(new THREE.MeshStandardMaterial(params));
+  function mesh(geometry, mat, position, parent = group) {
+    keep(geometry);
+    const object = new THREE.Mesh(geometry, mat);
+    if (position) object.position.set(...position);
+    object.castShadow = shadows;
+    object.receiveShadow = shadows;
+    parent.add(object);
+    return object;
+  }
+  function box(size, mat, position, parent) { return mesh(new THREE.BoxGeometry(...size), mat, position, parent); }
+  const whiteCeramic = keep(new THREE.MeshPhysicalMaterial({ color: 0xe9e3d8, roughness: 0.28, clearcoat: 0.3, clearcoatRoughness: 0.25 }));
+  const contactMap = keep(contactTexture());
+  function contact(x, z, width, depth, opacity = 0.75) {
+    const shadow = mesh(new THREE.PlaneGeometry(width, depth), keep(new THREE.MeshBasicMaterial({ map: contactMap, transparent: true, opacity, depthWrite: false })), [x, 0.008, z]);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.castShadow = false;
+    shadow.receiveShadow = false;
+  }
 
-  // Wall.
-  const wallTexture = canvasTexture(3000, 1200, paintWall);
-  const wall = new THREE.Mesh(
-    new THREE.PlaneGeometry(...WALL_SIZE),
-    // Painted colours are shown as painted, not through the tone curve.
-    new THREE.MeshBasicMaterial({ map: wallTexture, toneMapped: false }),
-  );
-  wall.position.set(0, WALL_CENTER_Y, WALL_Z);
-  wall.name = "Painted wall";
-  scene.add(wall);
-  disposables.push(wall.geometry, wall.material, wallTexture);
-
-  // Floor: pale boards with a satin finish, and the window's light lying across it.
-  const floorTexture = canvasTexture(2048, 1024, (ctx, w, h) => {
-    const base = ctx.createLinearGradient(0, 0, 0, h);
-    base.addColorStop(0, "#efe4d3");
-    base.addColorStop(1, "#fbf6ee");
-    ctx.fillStyle = base;
-    ctx.fillRect(0, 0, w, h);
-    // Board joints.
-    ctx.strokeStyle = "rgba(150, 130, 110, 0.18)";
-    ctx.lineWidth = 3;
-    for (let x = 0; x <= w; x += w / 12) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-    }
-    // Sun across the boards, continuing the wall's panes down onto the floor. The
-    // texture runs x from -15 to 15 across u, the far edge of the floor at v = 1.
-    const u = (x) => ((x + 15) / 30) * w;
-    for (const [x0, x1, alpha] of [[1.6, 3.6, 0.65], [4.3, 6.3, 0.6], [7.0, 9.0, 0.45]]) {
-      sunPatch(ctx, [[u(x0 + 2.2), 0], [u(x1 + 2.2), 0], [u(x1 - 1.4), h], [u(x0 - 1.4), h]], alpha);
-    }
-  });
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(WALL_SIZE[0], FLOOR_NEAR_Z - WALL_Z),
-    new THREE.MeshStandardMaterial({ map: floorTexture, roughness: 0.42, metalness: 0.05 }),
-  );
+  const wallMap = keep(wallFinish());
+  const wall = mesh(new THREE.PlaneGeometry(...WALL_SIZE), material({ map: wallMap, roughness: 0.96 }), [0, 6, WALL_Z]);
+  wall.name = "Blue grey plaster and softly projected window light";
+  wall.castShadow = false;
+  const trim = material({ color: 0xe4e1d9, roughness: 0.46 });
+  box([30, 0.2, 0.055], trim, [0, 0.1, WALL_Z + 0.028]);
+  box([30, 0.035, 0.078], trim, [0, 0.208, WALL_Z + 0.04]);
+  const floorMap = keep(floorFinish());
+  floorMap.wrapS = floorMap.wrapT = THREE.RepeatWrapping;
+  floorMap.repeat.set(1.35, 0.75);
+  const floorMaterial = keep(new THREE.MeshPhysicalMaterial({ map: floorMap, roughness: 0.31, metalness: 0, clearcoat: 0.2, clearcoatRoughness: 0.34 }));
+  const floor = mesh(new THREE.PlaneGeometry(30, 24), floorMaterial, [0, -0.012, 1]);
   floor.rotation.x = -Math.PI / 2;
-  floor.position.set(0, 0, (FLOOR_NEAR_Z + WALL_Z) / 2);
-  floor.receiveShadow = shadows;
-  floor.name = "Floor";
-  scene.add(floor);
-  disposables.push(floor.geometry, floor.material, floorTexture);
+  floor.castShadow = false;
+  floor.name = "Whitewashed oak · satin finish";
 
-  // Rug, and a crochet carrot lying on it.
-  const rug = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.35, 1.35, 0.04, 40),
-    new THREE.MeshStandardMaterial({ color: 0xf2e9dc, roughness: 0.95 }),
-  );
-  rug.scale.z = 0.62;
-  rug.position.set(2.9, 0.02, 1.3);
-  rug.receiveShadow = shadows;
-  rug.name = "Rug";
-  scene.add(rug);
-  disposables.push(rug.geometry, rug.material);
-  const carrot = new THREE.Group();
-  const carrotBody = new THREE.Mesh(
-    new THREE.ConeGeometry(0.19, 0.7, 14),
-    new THREE.MeshStandardMaterial({ color: 0xf0813a, roughness: 0.9 }),
-  );
-  carrotBody.rotation.z = Math.PI / 2 + 0.2;
-  carrotBody.castShadow = shadows;
-  carrot.add(carrotBody);
-  const leafGeometry = new THREE.SphereGeometry(0.09, 10, 8);
-  const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x5fa35a, roughness: 0.9 });
-  for (const [x, y, z] of [[0.38, 0.05, 0], [0.42, 0.13, 0.1], [0.44, 0.02, -0.1]]) {
-    const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
-    leaf.scale.set(1.6, 0.6, 0.8);
-    leaf.position.set(x, y, z);
-    carrot.add(leaf);
+  // The mug's inside, rolled rim, foot and handle are modeled, so the opening reads
+  // as a hollow ceramic object from every angle.
+  const mug = new THREE.Group(); group.add(mug);
+  mug.position.set(-4.85, 0.49, -2.8);
+  mug.rotation.set(0, -0.12, -Math.PI / 2);
+  const mugProfile = [[0,0.02],[0.29,0.02],[0.39,0.05],[0.445,0.13],[0.465,0.74],[0.462,0.84],[0.445,0.87],[0.414,0.87],[0.398,0.82],[0.395,0.2],[0.33,0.135],[0,0.135]].map(([x,y]) => new THREE.Vector2(x,y));
+  mesh(new THREE.LatheGeometry(mugProfile, 64), whiteCeramic, [0,0,0], mug);
+  const handle = mesh(new THREE.TorusGeometry(0.255, 0.07, 12, 40), whiteCeramic, [0.45, 0.43, 0], mug);
+  handle.scale.y = 1.22;
+  mug.name = "Hollow porcelain mug";
+  contact(-4.42, -2.8, 1.55, 1.1);
+
+  const paperMap = keep(texture(128, 256, (ctx, w, h) => {
+    ctx.fillStyle = "#d9d1bd"; ctx.fillRect(0,0,w,h);
+    for (let i = 0; i < h; i += 3) { ctx.fillStyle = `rgba(104,94,72,${0.06 + random() * 0.12})`; ctx.fillRect(0,i,w,0.7); }
+  }));
+  const paper = material({ map: paperMap, roughness: 0.94 });
+  const covers = [0xc9b5a1, 0xced0bc, 0xd9c7af];
+  for (let i = 0; i < 3; i++) {
+    const book = new THREE.Group(); group.add(book);
+    book.position.set(-3.82 + (i % 2) * 0.1, 0.095 + i * 0.175, -3.12);
+    book.rotation.y = [-0.04, 0.08, -0.12][i];
+    const cover = material({ color: covers[i], roughness: 0.7 });
+    box([1.25, 0.127, 0.77], paper, [0,0,0], book);
+    for (const side of [-1,1]) box([1.31,0.021,0.81], cover, [0,side*0.074,0], book);
+    box([0.03,0.17,0.81], cover, [-0.639,0,0], book);
+    book.name = "Clothbound book";
   }
-  carrot.position.set(3.35, 0.2, 1.35);
-  carrot.rotation.y = -0.4;
-  carrot.name = "Crochet carrot";
-  scene.add(carrot);
-  disposables.push(carrotBody.geometry, carrotBody.material, leafGeometry, leafMaterial);
+  contact(-3.8,-3.12,1.8,1.25);
 
-  // The plant, painted on a plane just in front of the play area.
-  const PLANT_Z = 1.8;
-  const distance = camera.position.z - PLANT_Z;
-  const halfH = distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
-  const halfW = halfH * aspect;
-  const plantTexture = canvasTexture(2048, Math.round(2048 / aspect), (ctx, w, h) => paintPlant(ctx, w, h, halfW, halfH));
-  const plant = new THREE.Mesh(
-    new THREE.PlaneGeometry(halfW * 2, halfH * 2),
-    new THREE.MeshBasicMaterial({ map: plantTexture, transparent: true, depthWrite: false, toneMapped: false }),
-  );
-  const lookDir = new THREE.Vector3();
-  camera.getWorldDirection(lookDir);
-  plant.position.copy(camera.position).addScaledVector(lookDir, distance / Math.abs(lookDir.z));
-  plant.position.z = PLANT_Z;
-  plant.quaternion.copy(camera.quaternion);
-  plant.renderOrder = 5;
-  plant.name = "Pot plant";
-  scene.add(plant);
-  disposables.push(plant.geometry, plant.material, plantTexture);
-
-  // Dust in the sunlight.
-  const MOTES = 90;
-  const motePositions = new Float32Array(MOTES * 3);
-  const moteState = [];
-  for (let i = 0; i < MOTES; i++) {
-    const p = { x: 1.5 + random() * 6, y: 0.2 + random() * 4.5, z: -5 + random() * 8, phase: random() * Math.PI * 2, rate: 0.2 + random() * 0.4 };
-    moteState.push(p);
-    motePositions.set([p.x, p.y, p.z], i * 3);
+  const plant = new THREE.Group(); group.add(plant);
+  plant.position.set(4.1, 0, -2.7);
+  plant.name = "Pothos in an ivory stoneware planter";
+  const potProfile = [[0,0.035],[0.49,0.035],[0.52,0.07],[0.65,1.03],[0.66,1.11],[0.635,1.135],[0.595,1.13],[0.583,1.075],[0.49,0.25],[0,0.25]].map(([x,y]) => new THREE.Vector2(x,y));
+  mesh(new THREE.LatheGeometry(potProfile, 64), whiteCeramic, [0,0,0], plant);
+  const soilMaterial = material({ color: 0x42382a, roughness: 1 });
+  mesh(new THREE.CylinderGeometry(0.596,0.596,0.025,40), soilMaterial, [0,1.06,0], plant);
+  const soilBits = [];
+  for (let i=0;i<45;i++) {
+    const r=Math.sqrt(random())*.55, a=random()*Math.PI*2;
+    const bit=new THREE.IcosahedronGeometry(.018+random()*.02,0);
+    bit.translate(Math.cos(a)*r,1.08,Math.sin(a)*r); soilBits.push(bit);
   }
-  const moteGeometry = new THREE.BufferGeometry();
-  moteGeometry.setAttribute("position", new THREE.BufferAttribute(motePositions, 3));
-  const moteTexture = softDisc(32, [255, 245, 220], 2);
-  const moteMaterial = new THREE.PointsMaterial({
-    map: moteTexture, size: 0.05, transparent: true, opacity: 0.7, depthWrite: false, sizeAttenuation: true,
-  });
-  const motes = new THREE.Points(moteGeometry, moteMaterial);
-  motes.frustumCulled = false;
-  scene.add(motes);
-  disposables.push(moteGeometry, moteMaterial, moteTexture);
-
-  // Light: the sky through the window, warm sun from the upper right that throws the
-  // shadows, and a soft bounce from the floor.
-  scene.add(new THREE.HemisphereLight(0xdfe9ff, 0xf1e6d6, 1.25));
-  const sun = new THREE.DirectionalLight(0xfff0d8, 2.4);
-  sun.position.set(6, 7, 2);
-  sun.target.position.set(0, 0, 0);
-  sun.castShadow = shadows;
-  sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -7, right: 7, top: 6, bottom: -4, near: 1, far: 24 });
-  sun.shadow.bias = -0.0005;
-  sun.shadow.normalBias = 0.02;
-  sun.shadow.radius = 4;
-  scene.add(sun, sun.target);
-  const bounce = new THREE.DirectionalLight(0xcfd9ee, 0.5);
-  bounce.position.set(-3, 3, 6);
-  scene.add(bounce);
-
-  let elapsed = 0;
-  function update(dt) {
-    elapsed += dt;
-    for (let i = 0; i < MOTES; i++) {
-      const p = moteState[i];
-      p.y += Math.sin(elapsed * p.rate + p.phase) * 0.04 * dt + 0.015 * dt;
-      p.x += Math.cos(elapsed * p.rate * 0.7 + p.phase) * 0.05 * dt;
-      if (p.y > 4.8) p.y = 0.2;
-      motePositions[i * 3] = p.x;
-      motePositions[i * 3 + 1] = p.y;
+  mesh(mergeGeometry(soilBits), material({color:0x79705a,roughness:1}), [0,0,0], plant);
+  contact(4.1,-2.7,1.9,1.55);
+  const leafMap = keep(texture(256,512,(ctx,w,h) => {
+    ctx.fillStyle="#c6d0a0"; ctx.fillRect(0,0,w,h);
+    const sheen=ctx.createLinearGradient(0,0,w,0);
+    sheen.addColorStop(0,"rgba(55,68,28,.1)"); sheen.addColorStop(.49,"rgba(255,255,230,.12)"); sheen.addColorStop(.51,"rgba(67,74,30,.13)"); sheen.addColorStop(1,"rgba(255,255,230,.02)");
+    ctx.fillStyle=sheen; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle="rgba(242,242,175,.3)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(w/2,0);ctx.lineTo(w/2,h);ctx.stroke();
+    ctx.lineWidth=.8;
+    for(let i=1;i<12;i++) for(const side of[-1,1]) {
+      const y=i*h/12; ctx.beginPath();ctx.moveTo(w/2,y);ctx.quadraticCurveTo(w/2+side*w*.18,y+h*.05,w/2+side*w*.49,y+h*.15);ctx.stroke();
     }
-    moteGeometry.attributes.position.needsUpdate = true;
+  }));
+  const leaves=[], stems=[];
+  for(let branch=0;branch<9;branch++) {
+    const angle=branch/9*Math.PI*2+.35;
+    const reach=.55+random()*.75;
+    const height=1.65+random()*1.35;
+    const end=new THREE.Vector3(Math.cos(angle)*reach,height+1,Math.sin(angle)*reach*.7);
+    const curve=new THREE.CubicBezierCurve3(new THREE.Vector3((random()-.5)*.2,1.04,(random()-.5)*.2),new THREE.Vector3(Math.cos(angle)*.18,1.8,Math.sin(angle)*.18),new THREE.Vector3(end.x*.8,end.y+.35,end.z*.7),end);
+    stems.push(new THREE.TubeGeometry(curve,22,.013,5,false));
+    for(let i=0;i<5;i++) {
+      const t=.25+i*.17;
+      const base=curve.getPoint(t);
+      const side=i%2?-1:1;
+      const leafAngle=angle+side*(.85+random()*.7);
+      const length=.5+random()*.28;
+      const direction=new THREE.Vector3(Math.cos(leafAngle),.12-random()*.38,Math.sin(leafAngle));
+      const petioleEnd=base.clone().add(direction.clone().multiplyScalar(.13));
+      const petiole=new THREE.QuadraticBezierCurve3(base,base.clone().add(new THREE.Vector3(0,.07,0)),petioleEnd);
+      stems.push(new THREE.TubeGeometry(petiole,4,.007,4,false));
+      leaves.push(leafGeometry(petioleEnd,direction,length,length*.65,side*.28+(random()-.5)*.35,random));
+    }
+    leaves.push(leafGeometry(end,new THREE.Vector3(Math.cos(angle),-.35,Math.sin(angle)),.65,.39,.3,random));
   }
+  const foliageMaterial=material({map:leafMap,vertexColors:true,roughness:.47,side:THREE.DoubleSide});
+  mesh(mergeGeometry(leaves),foliageMaterial,[0,0,0],plant);
+  mesh(mergeGeometry(stems),material({color:0x536143,roughness:.68}),[0,0,0],plant);
 
+  // A woven cotton mat at the edge of the room adds scale without blocking the
+  // rabbit's central play area. Its radial braids are actual low-profile geometry.
+  const rugPosition=new THREE.Vector3(3.67,.014,.38);
+  const rugMaterial=material({color:0xd2c5ae,roughness:1});
+  const rug=mesh(new THREE.CylinderGeometry(.9,.9,.028,64),rugMaterial,rugPosition.toArray());
+  rug.scale.z=.65;
+  const braids=[];
+  for(let ring=0;ring<18;ring++) {
+    const braid=new THREE.TorusGeometry(.06+ring*.047,.012,4,Math.max(18,ring*8));
+    braid.rotateX(-Math.PI/2);braid.scale(1,1,.65);braid.translate(rugPosition.x,.039,rugPosition.z);braids.push(braid);
+  }
+  mesh(mergeGeometry(braids),material({color:0xe4d9c6,roughness:1}),[0,0,0]);
+  contact(rugPosition.x,rugPosition.z,2.15,1.5,.4);
+
+  const villa = createVilla({ group, mesh, material, mergeGeometry });
+  contact(villa.position[0], villa.position[2], 3.2, 3.2, 0.7);
+
+  // Warm morning sun and cooler sky fill preserve the coat's volume. Shadows stay
+  // soft, but cast by the rabbit and all real room props rather than painted cutouts.
+  const hemisphere=new THREE.HemisphereLight(0xdce8f6,0xc8b99f,.78);group.add(hemisphere);
+  const sun=new THREE.DirectionalLight(0xffe4bd,2.55);
+  sun.position.set(5.5,7.5,3.8);sun.target.position.set(-1,0,-1.2);
+  sun.castShadow=shadows;sun.shadow.mapSize.set(2048,2048);
+  Object.assign(sun.shadow.camera,{left:-7,right:7,top:7,bottom:-5,near:.1,far:27});
+  sun.shadow.bias=-.00025;sun.shadow.normalBias=.018;sun.shadow.radius=4;
+  group.add(sun,sun.target);
+  const fill=new THREE.DirectionalLight(0xc5d9ee,.72);fill.position.set(-4,3,5);group.add(fill);
+  const rim=new THREE.DirectionalLight(0xffe8c6,.5);rim.position.set(2,4,-4);group.add(rim);
+
+  // Only a few tiny motes are visible; the room itself remains the backdrop.
+  const count=30,positions=new Float32Array(count*3),moteState=[];
+  for(let i=0;i<count;i++) {
+    const p={x:1+random()*4,y:.4+random()*3.2,z:-4+random()*4,phase:random()*6.28};moteState.push(p);positions.set([p.x,p.y,p.z],i*3);
+  }
+  const moteGeometry=keep(new THREE.BufferGeometry());moteGeometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
+  const moteMap=keep(texture(32,32,(ctx,w,h)=>{const g=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);g.addColorStop(0,"rgba(255,249,226,.7)");g.addColorStop(1,"rgba(255,249,226,0)");ctx.fillStyle=g;ctx.fillRect(0,0,w,h);}));
+  const motes=new THREE.Points(moteGeometry,keep(new THREE.PointsMaterial({map:moteMap,color:0xffedca,size:.014,transparent:true,opacity:.25,depthWrite:false})));group.add(motes);
+  let elapsed=0;
   return {
-    update,
     sun,
+    villa,
+    update(dt) {
+      elapsed+=dt;
+      for(let i=0;i<count;i++) {const p=moteState[i];positions[i*3]=p.x+Math.sin(elapsed*.13+p.phase)*.1;positions[i*3+1]=p.y+Math.sin(elapsed*.18+p.phase)*.07;}
+      moteGeometry.attributes.position.needsUpdate=true;
+    },
     dispose() {
-      for (const item of disposables) item.dispose?.();
+      scene.remove(group);
+      sun.shadow.map?.dispose();
+      for(const item of disposables)item.dispose?.();
     },
   };
 }

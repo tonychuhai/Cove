@@ -8,10 +8,9 @@
 const KEY = "bunny.rabbit";
 const VERSION = 1;
 
-// Closeness grows by these amounts; feeding counts a few times a day, and petting and
-// playing have cooldowns so holding the pointer on the rabbit is not a farm.
+// Carrots are always available. Only passive petting and playing rewards have cooldowns.
 export const RULES = {
-  feed: { intimacy: 20, mood: 18, perDay: 3, cooldown: 60 },
+  feed: { intimacy: 20, mood: 18 },
   pet: { intimacy: 3, mood: 4, cooldown: 45 },
   play: { intimacy: 10, mood: 12, cooldown: 300 },
   visit: { intimacy: 5 },
@@ -30,9 +29,9 @@ export const MOODS = [
 ];
 
 export const SPEECH = {
-  greet: ["你回来啦！今天扫地吗？", "早～阳光刚好晒到我。", "我在等你，也在等扫帚。", "今天想吃三根胡萝卜。"],
+  greet: ["你回来啦！今天扫地吗？", "早～阳光刚好晒到我。", "我在等你，也在等扫帚。", "想吃胡萝卜的时候，就来找你。"],
   feed: ["胡萝卜！！！", "咔嚓咔嚓……好吃。", "谢谢！叶子也要吃。", "唔……再来一根可以吗？"],
-  full: ["我吃饱啦，肚子圆圆的。", "今天吃得够多了，留一点给明天。"],
+  hungry: ["想吃胡萝卜啦，点一下 🥕 喂我吧。", "肚子咕咕叫……有胡萝卜吗？"],
   pet: ["好舒服……再摸摸～", "耳朵……对，就是那里。", "♡♡♡", "我原谅你昨天扫我了。"],
   play: ["扫帚！扫帚！扫帚！", "追不到我～追不到我～", "再挥一下！再挥一下！"],
   lunge: ["看我的！", "咬！", "别跑！"],
@@ -174,19 +173,12 @@ export function createPetState() {
     const lines = SPEECH[kind] ?? SPEECH.idle;
     return lines[Math.floor(Math.random() * lines.length)];
   };
-  const canFeed = () => {
-    if (state.fedOn !== dayKey(now())) return true;
-    return state.fedCount < RULES.feed.perDay && now() - state.lastFed > RULES.feed.cooldown * 1000;
-  };
+  const canFeed = () => true;
 
   function feed() {
     if (state.fedOn !== dayKey(now())) {
       state.fedOn = dayKey(now());
       state.fedCount = 0;
-    }
-    if (!canFeed()) {
-      emit("full", { text: line("full") });
-      return false;
     }
     state.fedCount++;
     state.meals++;

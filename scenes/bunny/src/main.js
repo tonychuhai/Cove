@@ -36,15 +36,18 @@ window.habitatFeed = () => {
 
 function fail(error) {
   console.error(error);
-  loading.hidden = true;
+  loading.textContent = error.message;
+  loading.setAttribute("role", "alert");
+  loading.removeAttribute("aria-hidden");
+  loading.style.cssText = "display:grid;place-items:center;padding:2rem;color:#604331;font:16px sans-serif";
 }
 
 async function start() {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "low-power" });
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 0.98;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0xc9d8ee, 1);
 
@@ -52,14 +55,44 @@ async function start() {
   const bounds0 = canvas.getBoundingClientRect();
   const aspect = bounds0.width > 0 && bounds0.height > 0 ? bounds0.width / bounds0.height : 16 / 9;
   const camera = new THREE.PerspectiveCamera(32, aspect, 0.1, 60);
-  camera.position.set(0, 1.7, 8.8);
-  camera.lookAt(0, 1.05, 0);
+  camera.position.set(0, 1.55, 7.1);
+  camera.lookAt(0, 0.95, 0);
   camera.updateMatrixWorld();
 
   const effects = createEffects(scene);
   const scenery = createScenery(scene, { camera, aspect });
+  // Broad window reflections are especially important on the rabbit's dark eyes.
+  const environment = new THREE.Scene();
+  environment.background = new THREE.Color(0xa7b5c9);
+  for (const [position, scale, color] of [
+    [[3, 4, 2], [3, 4, 1], [2.6, 2.2, 1.75]],
+    [[-3, 2, 3], [4, 3, 1], [0.45, 0.55, 0.72]],
+  ]) {
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(...scale.slice(0, 2)), new THREE.MeshBasicMaterial({ color: new THREE.Color(...color), side: THREE.DoubleSide }));
+    panel.position.fromArray(position);
+    panel.lookAt(0, 0.7, 0);
+    environment.add(panel);
+  }
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const reflection = pmrem.fromScene(environment, 0.04, 0.1, 30);
+  scene.environment = reflection.texture;
+  scene.environmentIntensity = 0.35;
+  pmrem.dispose();
+  environment.traverse((item) => { item.geometry?.dispose(); item.material?.dispose(); });
   const broom = createBroom(scene, { camera, effects });
-  const rabbit = createRabbit(scene, { effects });
+  const rabbit = await createRabbit(scene, { effects });
+  const contactCanvas = document.createElement("canvas");
+  contactCanvas.width = contactCanvas.height = 128;
+  const contactContext = contactCanvas.getContext("2d");
+  const contactGradient = contactContext.createRadialGradient(64, 64, 5, 64, 64, 64);
+  contactGradient.addColorStop(0, "rgba(51,39,28,.48)");
+  contactGradient.addColorStop(0.45, "rgba(51,39,28,.23)");
+  contactGradient.addColorStop(1, "rgba(51,39,28,0)");
+  contactContext.fillStyle = contactGradient;
+  contactContext.fillRect(0, 0, 128, 128);
+  const contact = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(contactCanvas), transparent: true, depthWrite: false }));
+  contact.rotation.x = -Math.PI / 2;
+  scene.add(contact);
   const pet = createPetState();
   const ui = createUI({ pet, wallpaper });
 
@@ -206,6 +239,9 @@ async function start() {
     const bounds = canvas.getBoundingClientRect();
     ui.placeBubble(bounds.left + ((headPoint.x + 1) / 2) * bounds.width, bounds.top + ((1 - headPoint.y) / 2) * bounds.height - 8);
 
+    contact.position.set(rabbit.root.position.x, -0.008, rabbit.root.position.z - 0.06);
+    contact.rotation.z = -rabbit.root.rotation.y;
+    contact.material.opacity = Math.max(0.06, 0.85 - rabbit.root.position.y * 0.65);
     renderer.render(scene, camera);
     renderedFrames++;
     if (!ready) {
