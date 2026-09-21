@@ -15,10 +15,13 @@
   -webkit-backdrop-filter: blur(18px);
 }
 #scene-switch .brand {
+  width: 100%;
   padding: 6px 0 4px;
   color: #f6f1ea;
   font: 700 11px/1 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
   letter-spacing: 0.22em;
+  /* Letter-spacing trails the last letter too; pull the word back to true centre. */
+  text-indent: 0.22em;
   text-transform: uppercase;
   text-align: center;
   opacity: 0.85;

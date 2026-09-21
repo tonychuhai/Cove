@@ -461,8 +461,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var awake = true
   private var layout: [CGRect] = []
   private var lastPoint = NSPoint(x: -1e4, y: -1e4)
-  private var leftWasDown = false
   private var desktopPress: (point: NSPoint, time: TimeInterval)?
+  private var tapMonitors: [Any] = []
   private var snapshots: DispatchSourceSignal?
   private var status: NSStatusItem?
   private let state = NSMenuItem()
@@ -612,13 +612,13 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   private func build() {
     desktopPress = nil
-    leftWasDown = NSEvent.pressedMouseButtons & 1 != 0
     layout = NSScreen.screens.map(\.frame)
     for screen in screens + retiring { screen.close() }
     retiring = []
     screens = NSScreen.screens.map { Wallpaper(screen: $0, root: root) }
     applyRate()
     screens.first?.whenReady { [weak self] in self?.scheduleStill() }
+    if tapMonitors.isEmpty { watchDesktopTaps() }
   }
 
   /// A scene change the person is watching. The old scene stays up while the new one
@@ -627,7 +627,6 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var retiring: [Wallpaper] = []
   private func crossfade() {
     desktopPress = nil
-    leftWasDown = NSEvent.pressedMouseButtons & 1 != 0
     layout = NSScreen.screens.map(\.frame)
     // A switch during a switch: whatever was on its way out goes now.
     for screen in retiring { screen.close() }
@@ -681,13 +680,11 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private func updateTimers(pollExposure: Bool) {
-    // Pointer sampling need not outrun the animation. A wallpaper merely resting behind
-    // windows keeps a slow beat, so a tap on the left rail still changes the scene; only
-    // one that is deliberately still (paused, Low Power Mode, dark display) sleeps.
-    let wanted = pollExposure ? max(15, min(30, applied)) : 0
+    // Pointer sampling need not outrun the animation, nor wake a stopped wallpaper. Taps
+    // on the left rail arrive as events of their own, so this is only for the cursor.
+    let wanted = min(30, applied)
     if wanted != pointerRate {
       desktopPress = nil
-      leftWasDown = NSEvent.pressedMouseButtons & 1 != 0
       pointerTimer?.invalidate()
       pointerTimer = nil
       pointerRate = wanted
@@ -873,7 +870,6 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
   /// The cursor belongs to the Finder, so its position is read rather than captured.
   private func trackPointer() {
     let point = NSEvent.mouseLocation
-    trackDesktopTap(at: point)
     guard abs(point.x - lastPoint.x) > 0.2 || abs(point.y - lastPoint.y) > 0.2 else { return }
     lastPoint = point
     for (index, screen) in NSScreen.screens.enumerated() where index < screens.count {
@@ -884,27 +880,36 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
   }
 
-  /// Sample only the button state. No event interception or input permission; Finder
-  /// still receives the original click. A drag or a click over an app is ignored.
-  private func trackDesktopTap(at point: NSPoint) {
-    let down = NSEvent.pressedMouseButtons & 1 != 0
-    defer { leftWasDown = down }
-    if down && !leftWasDown {
-      desktopPress = desktopPointIsExposed(point) ? (point, ProcessInfo.processInfo.systemUptime) : nil
+  /// A short tap on bare desktop, seen through a global monitor: the events themselves,
+  /// not a timer's glimpse of the button, so a quick click is never missed. Monitoring
+  /// mouse buttons needs no permission and changes nothing; Finder still gets the click.
+  /// A drag, a long press, or a click over an app's window is not a tap.
+  private func watchDesktopTaps() {
+    let downs = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+      guard let self else { return }
+      let point = NSEvent.mouseLocation
+      self.desktopPress = self.desktopPointIsExposed(point) ? (point, ProcessInfo.processInfo.systemUptime) : nil
     }
-    if down, let start = desktopPress, hypot(point.x - start.point.x, point.y - start.point.y) > 8 {
-      desktopPress = nil
+    let drags = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { [weak self] _ in
+      guard let self, let start = self.desktopPress else { return }
+      let point = NSEvent.mouseLocation
+      if hypot(point.x - start.point.x, point.y - start.point.y) > 8 { self.desktopPress = nil }
     }
-    guard !down, leftWasDown, let start = desktopPress else { return }
-    desktopPress = nil
-    guard ProcessInfo.processInfo.systemUptime - start.time < 0.65,
-      hypot(point.x - start.point.x, point.y - start.point.y) <= 8,
-      desktopPointIsExposed(point) else { return }
-    for (index, screen) in NSScreen.screens.enumerated() where index < screens.count {
-      if screen.frame.contains(point) {
-        screens[index].click(at: NSPoint(x: point.x - screen.frame.minX, y: screen.frame.maxY - point.y))
+    let ups = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
+      guard let self, let start = self.desktopPress else { return }
+      self.desktopPress = nil
+      let point = NSEvent.mouseLocation
+      guard ProcessInfo.processInfo.systemUptime - start.time < 0.65,
+        hypot(point.x - start.point.x, point.y - start.point.y) <= 8,
+        self.desktopPointIsExposed(point) else { return }
+      for (index, screen) in NSScreen.screens.enumerated() where index < self.screens.count {
+        if screen.frame.contains(point) {
+          self.screens[index].click(at: NSPoint(x: point.x - screen.frame.minX, y: screen.frame.maxY - point.y))
+        }
       }
     }
+    tapMonitors = [downs, drags, ups].compactMap { $0 }
+    if tapMonitors.count < 3 { NSLog("cove: the desktop tap monitor did not start") }
   }
 
   private func desktopPointIsExposed(_ point: NSPoint) -> Bool {
