@@ -6,7 +6,7 @@ https://github.com/user-attachments/assets/675e99c0-0e4f-43cf-b887-8cfe9d6ef589
 
 https://github.com/user-attachments/assets/dea84ad3-d054-4328-b521-40fcbdb68cec
 
-![Muse 互动换装：上海外滩，旗袍长裙](docs/images/muse.jpg)
+https://github.com/user-attachments/assets/00aa7a90-b081-4724-a405-42f3d7d9ed08
 
 Mac 桌面上的活场景。三个场景，菜单栏一键切换：
 

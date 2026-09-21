@@ -4,7 +4,7 @@ https://github.com/user-attachments/assets/675e99c0-0e4f-43cf-b887-8cfe9d6ef589
 
 https://github.com/user-attachments/assets/dea84ad3-d054-4328-b521-40fcbdb68cec
 
-![Muse dress-up: Shanghai Bund, cheongsam and long skirt](images/muse.jpg)
+https://github.com/user-attachments/assets/00aa7a90-b081-4724-a405-42f3d7d9ed08
 
 Living scenes for your Mac desktop: an aquarium whose fish you can feed and fish for, a lop rabbit that chases the broom your cursor has become, and Muse, a dress-up companion who turns in place to change outfits.
 
