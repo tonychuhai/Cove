@@ -2,3 +2,6 @@
 *.blend1
 node_modules/
 .firecrawl/
+windows/bin/
+windows/obj/
+dist/

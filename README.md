@@ -8,14 +8,14 @@ https://github.com/user-attachments/assets/dea84ad3-d054-4328-b521-40fcbdb68cec
 
 https://github.com/user-attachments/assets/00aa7a90-b081-4724-a405-42f3d7d9ed08
 
-Mac 桌面上的活场景。四个场景，菜单栏一键切换：
+桌面上的活场景。四个场景，Mac 菜单栏或 Windows 托盘一键切换：
 
 - **Riverscape 鱼缸** —— 一缸会认鼠标的鱼。鼠标是一根钓线，停在鱼群边上会有鱼咬钩，提到屏幕顶端就能把它拎出来再放回去。
 - **Bunny 兔子** —— 一只住在阳光房间里的垂耳兔。鼠标是一把小扫帚，挥一挥它就追着咬；停下来慢慢摸它，是抚摸。会记住亲密度和心情。
 - **Muse 互动换装** —— 点击人物转一圈，在日常、上海、伦敦、东京四套穿搭间切换，城市背景同步过渡。
 - **Critters 纸上小伙伴** —— 一群用线条画出来的小动物。鼠标靠近，附近的会转头盯着你；离得远的打哈欠、说小话。菜单栏可以换一批。
 
-全部本地渲染（Three.js / WebGL2 与 Canvas 2D），不联网、不要账号、不要任何权限。目前只支持 macOS 13 及以上。
+全部本地渲染（Three.js / WebGL2 与 Canvas 2D），不联网、不要账号、不要任何权限。支持 macOS 13 及以上，以及 64 位 Windows 10（2004 起）和 Windows 11。Windows 没有单独的安装包，克隆仓库后在 PowerShell 里运行 `windows/install.ps1` 即可，脚本会在本机编译并装好。
 
 ## 安装
 
@@ -44,9 +44,35 @@ sh wallpaper/install.sh
 更新：`git pull` 之后再跑一次 `sh wallpaper/install.sh`。
 卸载：`sh wallpaper/uninstall.sh`，然后在系统设置里换回你原来的壁纸。
 
+### Windows
+
+Windows 10 2004 或 Windows 11，64 位。编译需要 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)，运行需要 WebView2（Windows 11 已自带；Windows 10 若没有，安装脚本会给出链接）。
+
+用 PowerShell，在项目目录运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File windows/install.ps1
+```
+
+也可以把下面这段话整段交给 Codex、Cursor 或 Claude Code：
+
+```text
+帮我在 Windows 上安装 Cove 桌面壁纸：
+1. 确认 dotnet --version 能看到 .NET 8 或更新的 SDK，没有就安装 https://dotnet.microsoft.com/download/dotnet/8.0 ；
+2. 把 https://github.com/tonychuhai/cove.git 克隆到文档目录的 code\cove；
+3. 在该目录运行 powershell -ExecutionPolicy Bypass -File windows\install.ps1；
+4. 装完告诉我托盘图标在哪、怎么切换场景。
+```
+
+脚本会编译，装到 `%LOCALAPPDATA%\Cove`，写入当前用户的登录启动项并立刻运行。不需要管理员。画面在桌面图标下面，图标、点击、拖拽照常。任务栏托盘里是和 Mac 菜单栏同一份菜单。
+
+第一帧要几秒。之后会把当前场景的一帧设成桌面壁纸，锁屏看到的就是这张静止的图；切场景约 3 秒后跟着换。不想改原来的壁纸：把 `%APPDATA%\Cove\settings.json` 里的 `"still"` 改成 `false`。
+
+更新：拉完代码再跑一次安装脚本。卸载：`powershell -ExecutionPolicy Bypass -File windows/uninstall.ps1`，然后在设置里换回原来的壁纸。场景选择、暂停和兔子的记忆留在 `%APPDATA%\Cove\settings.json`。
+
 ## 怎么玩
 
-左侧竖条一键换场景，菜单栏图标也可以：
+左侧竖条一键换场景。Mac 上图标在菜单栏，Windows 上在任务栏托盘，菜单是同一份：
 
 | 菜单 | 作用 |
 | --- | --- |
@@ -69,7 +95,7 @@ sh wallpaper/install.sh
 
 ## 常见问题
 
-**耗电吗？** 比静态壁纸多一点。壁纸完全露出时最高 60 fps（电池 30），被窗口盖住大半降到 20，几乎全盖住就停，低电量模式、锁屏、合盖时不画。
+**耗电吗？** 比静态壁纸多一点。壁纸完全露出时最高 60 fps（电池 30），被窗口盖住大半降到 20，几乎全盖住就停，低电量模式（Windows 上是节能模式）、锁屏、合盖或休眠时不画。
 
 **会监听键盘吗？** 不会。只读光标位置、窗口位置（用来判断露出多少），以及左键的按下松开（用来点切换条），不记录、不上传。
 
@@ -77,7 +103,7 @@ sh wallpaper/install.sh
 
 **画面不动了？** 打开菜单看状态行，多半是被盖住、低电量或开了"减弱动态效果"（此时会以暂停状态启动，点 Resume 即可）。
 
-**锁屏时鱼怎么不动？** 锁屏画面是系统画的，第三方窗口到不了那一层，Cove 只能把当前场景的一帧交给它当背景。切场景后约 3 秒这张图会跟着换。旧版本把它存在 `~/Pictures/Cove.png`，可以删掉。
+**锁屏时鱼怎么不动？** 锁屏画面是系统画的，第三方窗口到不了那一层，Cove 只能把当前场景的一帧交给它当背景。切场景后约 3 秒这张图会跟着换。Mac 上旧版本把它存在 `~/Pictures/Cove.png`，可以删掉。Windows 上这张图在 `%APPDATA%\Cove\still`。
 
 ## 浏览器里试试
 
@@ -92,9 +118,10 @@ sh wallpaper/install.sh
 | `scenes/muse/` | 互动换装：透明人物图集、城市背景、转身状态与按需绘制 |
 | `scenes/critters/` | 纸上小伙伴：物种、手绘线条、注视与随机小动作 |
 | `wallpaper/` | Mac App（Swift，一个 WebView 放在桌面层）与安装 / 卸载脚本 |
+| `windows/` | Windows 壁纸（C# / WebView2，窗口在桌面图标后面）与安装 / 卸载脚本 |
 | `vendor/` | 随包附带的 Three.js |
 
-`npm run check` 做语法检查，`npm test` 跑鱼群行为、渲染预算、植物几何、Muse 换装和纸上小伙伴的无头测试。壁纸日志在 `/tmp/cove.log`，给进程发 `SIGUSR1` 会把第一块屏的画面存到 `/tmp/cove.png`。新场景放在 `scenes/<名字>/`，在 `wallpaper/Wallpaper.swift` 的 `habitats` 列表里登记一行即可出现在 Scene 菜单。
+`npm run check` 做语法检查，`npm test` 跑鱼群行为、渲染预算、植物几何、Muse 换装和纸上小伙伴的无头测试。Mac 壁纸日志在 `/tmp/cove.log`，给进程发 `SIGUSR1` 会把第一块屏的画面存到 `/tmp/cove.png`。Windows 日志在 `%LOCALAPPDATA%\Cove\cove.log`。新场景放在 `scenes/<名字>/`，在 `wallpaper/Wallpaper.swift` 和 `windows/Program.cs` 的场景列表里各登记一行，才会出现在 Scene 菜单。
 
 ## 致谢与许可
 

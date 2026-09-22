@@ -6,15 +6,15 @@ https://github.com/user-attachments/assets/dea84ad3-d054-4328-b521-40fcbdb68cec
 
 https://github.com/user-attachments/assets/00aa7a90-b081-4724-a405-42f3d7d9ed08
 
-Living scenes for your Mac desktop: an aquarium whose fish you can feed and fish for, a lop rabbit that chases the broom your cursor has become, Muse, a dress-up companion who turns in place to change outfits, and a sketchbook of little animals that watch the cursor.
+Living scenes for the desktop: an aquarium whose fish you can feed and fish for, a lop rabbit that chases the broom your cursor has become, Muse, a dress-up companion who turns in place to change outfits, and a sketchbook of little animals that watch the cursor.
 
 Cove is built on [Desktop Habitats](https://github.com/chaseleantj/desktop-habitats) by Chase Lean. The Riverscape aquarium, its water, plants and fish, and the macOS wallpaper app are his work, used under the MIT license; the fishing line, the medaka, the Bunny scene, Muse, Critters and the scene menu were added here. The Critters scene is adapted from [little-critters](https://github.com/GordenSun/little-critters) by GordenSun.
 
 Have you always wanted an aquarium? Now you can have it, right on your desktop :)
 
-The fish react to your cursor and compete for food, while the plants sway in a slow current. There are four scenes: **Riverscape**, a planted freshwater aquarium; **Bunny**, a lop rabbit in a sunny room whose cursor is a broom — wave it and the rabbit chases and bites it; **Muse**, who turns a full circle to change among Everyday, Shanghai, London and Tokyo; and **Critters**, a page of line-drawn animals that turn to watch the pointer. Switch between them from the menu bar.
+The fish react to your cursor and compete for food, while the plants sway in a slow current. There are four scenes: **Riverscape**, a planted freshwater aquarium; **Bunny**, a lop rabbit in a sunny room whose cursor is a broom — wave it and the rabbit chases and bites it; **Muse**, who turns a full circle to change among Everyday, Shanghai, London and Tokyo; and **Critters**, a page of line-drawn animals that turn to watch the pointer. Switch between them from the Mac menu bar or the Windows notification area.
 
-The scenes are rendered live with Three.js and WebGL2. Everything runs locally, with no account or internet connection needed after setup. Desktop wallpaper support is **macOS only** for now; you can also try either scene in a browser.
+The scenes are rendered live with Three.js and WebGL2. Everything runs locally, with no account or internet connection needed after setup. The desktop app runs on macOS 13 or newer, and on 64-bit Windows 10 (2004 or newer) and Windows 11. There is no separate Windows installer to download: clone the repo and run `windows/install.ps1` in PowerShell, and the script builds and installs it on that machine. You can also try any scene in a browser.
 
 ## Install on Mac
 
@@ -36,9 +36,23 @@ The app keeps a frame of the current scene as your desktop picture, underneath t
 
 You don't need Node.js for the wallpaper. If you already have it, `npm run wallpaper` runs the same installer.
 
+## Install on Windows
+
+You need 64-bit Windows 10 (version 2004 or newer) or Windows 11, the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) to compile, and the WebView2 runtime, which Windows 11 already has. From the project folder, in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File windows/install.ps1
+```
+
+The script builds the app, installs it at `%LOCALAPPDATA%\Cove`, registers it to start when you sign in, and launches it. It does not need an administrator. The picture sits behind the desktop icons, so files, clicks and dragging work as usual. The tray icon has the same menu as the Mac menu bar.
+
+The first frame takes a few seconds. Cove then sets one frame of the current scene as the desktop picture, which is what the lock screen can show, and replaces it a few seconds after each scene change. To leave your picture alone, set `"still"` to `false` in `%APPDATA%\Cove\settings.json`.
+
+To update, pull the latest source and run the installer again. To remove it, run `windows/uninstall.ps1`, then pick your old wallpaper in Settings. The scene choice, pause and the rabbit's memory stay in `settings.json`.
+
 ## Use the wallpaper
 
-Click the fish, hare, shirt or paw icon in the menu bar:
+Click the fish, hare, shirt or paw icon in the Mac menu bar, or the same icon in the Windows notification area:
 
 - **Feed** drops ten pellets into each screen's tank, or puts a carrot down for the rabbit. Uneaten pellets dissolve after 20–40 seconds of running simulation time, measured from when they touch the water.
 - **Change outfit · 转身换装** turns Muse to the next look. The last outfit is remembered.
@@ -59,7 +73,7 @@ The cursor is also a fishing line: a baited hook hangs wherever the pointer is. 
 
 ### Does it work on Windows or Linux?
 
-The desktop app supports macOS only. The browser preview needs a browser with WebGL2, but there is no wallpaper installer for Windows or Linux.
+Windows 10 (2004 or newer) and Windows 11 have an installer: `windows/install.ps1`. It puts the same scenes behind the desktop icons and uses the notification area instead of the menu bar. There is no Linux wallpaper installer. The browser preview needs a browser with WebGL2 on any system.
 
 ### Will it drain my battery?
 
@@ -93,7 +107,7 @@ The app does not request Accessibility, Input Monitoring or Screen Recording acc
 
 ### Why have the fish stopped moving?
 
-Open the fish menu to see the current status. The wallpaper stops when it is almost entirely covered, in Low Power Mode, and while the screen is locked or asleep.
+Open the fish menu to see the current status. The wallpaper stops when it is almost entirely covered, in Low Power Mode (Energy saver on Windows), and while the screen is locked or asleep.
 
 If Reduce Motion is enabled in macOS, the aquarium starts paused unless you have already saved a different choice. Choose **Resume** to animate it. Low Power Mode must be turned off before animation can resume.
 

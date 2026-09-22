@@ -18,7 +18,8 @@ let sceneScheme = "cove"
 let sceneHost = "local"
 
 /// The scenes the app can show. Each lives in scenes/<id>/ with a wallpaper.html; the
-/// choice is kept in UserDefaults and survives a restart.
+/// choice is kept in UserDefaults and survives a restart. The Windows host has the same
+/// list in windows/Program.cs.
 struct Habitat {
   let id: String
   let title: String
